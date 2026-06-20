@@ -87,6 +87,8 @@ Expected behavior:
 - Structured/unstructured queries use tools.
 - Unstructured summaries should gather evidence quickly (typically one tool
    call) and then produce a final synthesis without looping.
+- In reused sessions, unstructured finalization must be based only on the
+   current user turn, not older tool observations from checkpointed history.
 - Out-of-scope queries are declined politely and should not be answered from general knowledge.
 
 ## 4) What to check for Task 1 grading
@@ -189,3 +191,36 @@ Expected (approx):
 - .env.example
 
 These are the core files used to run and inspect Task 1.
+
+## 8) Task 2 Memory Usage (Phase 4/5)
+
+### Run with a session ID
+
+```bash
+python main.py --session alice
+```
+
+### List persisted sessions
+
+```bash
+python main.py --list-sessions
+```
+
+### In interactive mode
+
+- Type `sessions` to list saved session IDs.
+- Type `profile` to display current session profile memory.
+
+### Verify profile memory
+
+1. Run with a fixed session:
+
+```bash
+python main.py --session memory-smoke
+```
+
+2. Ask a preference statement, for example:
+   - `I prefer concise answers with examples.`
+3. Ask:
+   - `What do you remember about me?`
+4. Confirm the response includes persisted profile facts.
