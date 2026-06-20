@@ -24,6 +24,13 @@ from typing_extensions import TypedDict
 
 from data_loader import get_categories, load_dataset
 from llm_config import make_llm
+from memory import (
+    format_profile_for_prompt,
+    get_checkpointer,
+    load_user_profile,
+    save_user_profile,
+    update_user_profile,
+)
 from tools import build_tools, reset_filter
 
 MAX_ITERATIONS = 12
@@ -59,6 +66,9 @@ Dataset facts:
 - total rows: {row_count}
 - categories ({category_count}): {categories}
 
+User profile context:
+{profile_context}
+
 Behavior requirements:
 - For structured questions, call tools and produce exact data-driven answers.
 - For unstructured questions, gather evidence with tools, then summarize.
@@ -90,6 +100,8 @@ class AgentState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
     query_type: QueryType
     iteration_count: int
+    session_id: str
+    user_profile: dict[str, Any]
 
 
 def normalize_query_type(raw_label: str) -> QueryType:
@@ -161,6 +173,16 @@ def _has_tool_observation(messages: list[BaseMessage]) -> bool:
     return any(isinstance(msg, ToolMessage) for msg in messages)
 
 
+def _messages_since_latest_human(
+    messages: list[BaseMessage],
+) -> list[BaseMessage]:
+    """Return only messages that belong to the latest user turn."""
+    for index in range(len(messages) - 1, -1, -1):
+        if isinstance(messages[index], HumanMessage):
+            return messages[index:]
+    return messages
+
+
 def build_agent_node(tools: list[Any]):
     """Create the main agent node with bound tools."""
     llm = make_llm(role="main", temperature=0.0).bind_tools(tools)
@@ -187,16 +209,22 @@ def build_agent_node(tools: list[Any]):
             row_count=f"{len(df):,}",
             category_count=len(get_categories()),
             categories=categories,
+            profile_context=format_profile_for_prompt(
+                state.get("user_profile", {})
+            ),
         )
         messages = state["messages"]
         if not messages or not isinstance(messages[0], SystemMessage):
             messages = [SystemMessage(content=prompt)] + list(messages)
 
+        current_turn_messages = _messages_since_latest_human(list(messages))
+
         # For unstructured summarization, one evidence-gathering tool result
-        # is enough. Force synthesis immediately to avoid redundant tool loops.
+        # in the current turn is enough. Ignore prior session history so
+        # persisted checkpoints cannot trigger premature finalization.
         if (
             state.get("query_type") == "unstructured"
-            and _has_tool_observation(list(messages))
+            and _has_tool_observation(current_turn_messages)
         ):
             messages = list(messages) + [
                 SystemMessage(content=FORCE_UNSTRUCTURED_FINAL_INSTRUCTION)
@@ -208,8 +236,8 @@ def build_agent_node(tools: list[Any]):
             }
 
         # If the model just repeated an identical tool call, force a final
-        # answer with a tool-less LLM so the loop cannot continue.
-        if _last_tool_call_repeats(list(messages)):
+        # answer with a tool-less LLM so the current turn cannot loop.
+        if _last_tool_call_repeats(current_turn_messages):
             messages = list(messages) + [
                 SystemMessage(content=FORCE_FINAL_ANSWER_INSTRUCTION)
             ]
@@ -246,7 +274,7 @@ def out_of_scope_node(state: AgentState) -> dict[str, Any]:
     return {"messages": [AIMessage(content=OUT_OF_SCOPE_MESSAGE)]}
 
 
-def build_graph():
+def build_graph(checkpointer: Any | None = None):
     """Compile and return the Task 1 graph."""
     tools = build_tools()
     workflow = StateGraph(AgentState)
@@ -274,27 +302,53 @@ def build_graph():
     )
     workflow.add_edge("tools", "agent")
     workflow.add_edge("out_of_scope", END)
-    return workflow.compile()
+    return workflow.compile(checkpointer=checkpointer)
+
+
+def is_memory_question(query: str) -> bool:
+    """Detect direct user-profile memory questions."""
+    normalized = query.strip().lower()
+    triggers = (
+        "what do you remember about me",
+        "what do you know about me",
+        "remember about me",
+    )
+    return any(trigger in normalized for trigger in triggers)
 
 
 def run_query(
     compiled_graph: Any,
     query: str,
     verbose: bool = True,
+    session_id: str = "default",
 ) -> tuple[str, list[dict[str, str]]]:
     """Execute one query and collect reasoning steps for CLI display."""
     reset_filter()
+    profile = load_user_profile(session_id)
+
+    if is_memory_question(query):
+        answer = format_profile_for_prompt(profile)
+        if verbose:
+            print(f"\n[final answer]\n{answer}")
+        return answer, []
 
     state: AgentState = {
         "messages": [HumanMessage(content=query)],
         "query_type": "structured",
         "iteration_count": 0,
+        "session_id": session_id,
+        "user_profile": profile,
     }
 
     steps: list[dict[str, str]] = []
     answer = ""
+    config = {"configurable": {"thread_id": session_id}}
 
-    for event in compiled_graph.stream(state, stream_mode="values"):
+    for event in compiled_graph.stream(
+        state,
+        stream_mode="values",
+        config=config,
+    ):
         messages = event.get("messages", [])
         if not messages:
             continue
@@ -334,12 +388,22 @@ def run_query(
                 )
                 print(f"\n[observation from {step['name']}]\n{preview}")
 
+    updated_profile = update_user_profile(
+        profile=profile,
+        user_text=query,
+        assistant_text=answer,
+    )
+    save_user_profile(session_id, updated_profile)
+
     return answer, steps
 
 
 # Exposed for LangGraph CLI integrations.
 # Keep module import safe when NEBIUS_API_KEY is not set.
 try:
+    graph = build_graph(checkpointer=get_checkpointer())
+except (ModuleNotFoundError, ImportError):
+    # Allow development without optional sqlite checkpointer package.
     graph = build_graph()
 except EnvironmentError:
     graph = None

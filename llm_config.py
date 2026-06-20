@@ -40,6 +40,7 @@ def resolve_model_for_role(role: str) -> str:
     role_key_map = {
         "main": "NEBIUS_MAIN_MODEL",
         "router": "NEBIUS_ROUTER_MODEL",
+        "profile": "NEBIUS_PROFILE_MODEL",
     }
     role_key = role_key_map.get(role)
     if role_key:
