@@ -20,6 +20,7 @@ from llm_config import make_llm
 
 _DEFAULT_MEMORY_DIR = Path("memory")
 _DEFAULT_PROFILES_DIR = _DEFAULT_MEMORY_DIR / "profiles"
+_DEFAULT_PENDING_DIR = _DEFAULT_MEMORY_DIR / "pending_recommendations"
 _DEFAULT_CHECKPOINT_DB = _DEFAULT_MEMORY_DIR / "checkpoints.db"
 
 _PROFILE_EXTRACT_SYSTEM_PROMPT = """Extract ONLY durable user-profile facts.
@@ -57,6 +58,14 @@ def _sanitize_session_id(session_id: str) -> str:
 def _profile_path(session_id: str, profiles_dir: Path) -> Path:
     """Return profile path for a session ID."""
     return profiles_dir / f"{_sanitize_session_id(session_id)}.json"
+
+
+def _pending_recommendation_path(
+    session_id: str,
+    pending_dir: Path,
+) -> Path:
+    """Return pending recommendation path for a session ID."""
+    return pending_dir / f"{_sanitize_session_id(session_id)}.json"
 
 
 def get_checkpointer(
@@ -145,6 +154,62 @@ def save_user_profile(
     temp_path.replace(path)
 
 
+def load_pending_recommendation(
+    session_id: str,
+    pending_dir: str = str(_DEFAULT_PENDING_DIR),
+) -> str | None:
+    """Load a pending query recommendation for a session if one exists."""
+    base_dir = Path(pending_dir)
+    base_dir.mkdir(parents=True, exist_ok=True)
+    path = _pending_recommendation_path(session_id, base_dir)
+
+    if not path.exists():
+        return None
+
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            loaded = json.load(handle)
+        if not isinstance(loaded, dict):
+            return None
+        suggestion = loaded.get("suggestion")
+        if not isinstance(suggestion, str):
+            return None
+        return suggestion.strip() or None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def save_pending_recommendation(
+    session_id: str,
+    suggestion: str | None,
+    pending_dir: str = str(_DEFAULT_PENDING_DIR),
+) -> None:
+    """Persist or clear a pending query recommendation atomically."""
+    base_dir = Path(pending_dir)
+    base_dir.mkdir(parents=True, exist_ok=True)
+    path = _pending_recommendation_path(session_id, base_dir)
+
+    normalized = suggestion.strip() if isinstance(suggestion, str) else ""
+    if not normalized:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        return
+
+    with NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=str(base_dir),
+        delete=False,
+    ) as temp:
+        json.dump({"suggestion": normalized}, temp, indent=2)
+        temp.flush()
+        temp_path = Path(temp.name)
+
+    temp_path.replace(path)
+
+
 def _merge_profile(
     current_profile: dict[str, Any],
     new_facts: dict[str, Any],
@@ -201,7 +266,13 @@ def update_user_profile(
         if not isinstance(new_facts, dict):
             return profile
         return _merge_profile(profile, new_facts)
-    except (ValueError, TypeError, json.JSONDecodeError, RuntimeError):
+    except (
+        EnvironmentError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+        RuntimeError,
+    ):
         # Never fail a user query because profile extraction failed.
         return profile
 

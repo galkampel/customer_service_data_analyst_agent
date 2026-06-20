@@ -1,7 +1,8 @@
 """Task 1 LangGraph ReAct agent for the customer-service dataset.
 
 This graph implements:
-- Dedicated query router (structured / unstructured / out_of_scope)
+- Dedicated query router
+    (structured / unstructured / out_of_scope / recommender)
 - ReAct tool loop (agent <-> tools)
 - Max-iteration fallback for safe termination
 """
@@ -27,14 +28,28 @@ from llm_config import make_llm
 from memory import (
     format_profile_for_prompt,
     get_checkpointer,
+    load_pending_recommendation,
     load_user_profile,
+    save_pending_recommendation,
     save_user_profile,
     update_user_profile,
+)
+from recommender import (
+    format_suggestion_response,
+    generate_suggestion,
+    is_confirmation,
+    is_declination,
+    refine_suggestion,
 )
 from tools import build_tools, reset_filter
 
 MAX_ITERATIONS = 12
-QueryType = Literal["structured", "unstructured", "out_of_scope"]
+QueryType = Literal[
+    "structured",
+    "unstructured",
+    "out_of_scope",
+    "recommender",
+]
 
 ROUTER_SYSTEM_PROMPT = """You classify user queries for a Customer Service
 Data Analyst Agent.
@@ -46,16 +61,20 @@ Return exactly ONE label from:
 - structured: concrete, data-driven dataset query
 - unstructured: open-ended dataset summary/explanation
 - out_of_scope: unrelated to the dataset
+- recommender: asks for a suggested next dataset query
 
 Examples:
 - 'How many refund requests did we get?' -> structured
 - 'Show me 3 examples from SHIPPING' -> structured
 - 'Summarize FEEDBACK' -> unstructured
 - 'Who won the Champions League?' -> out_of_scope
+- 'What should I query next?' -> recommender
+- 'Suggest a useful follow-up analysis' -> recommender
+- 'Recommend a question about this dataset' -> recommender
 
 Important rule: if uncertain, return structured.
 
-Respond with ONLY: structured, unstructured, or out_of_scope.
+Respond with ONLY: structured, unstructured, out_of_scope, or recommender.
 """
 
 AGENT_SYSTEM_PROMPT = """You are a Customer Service Data Analyst Agent.
@@ -102,6 +121,7 @@ class AgentState(TypedDict):
     iteration_count: int
     session_id: str
     user_profile: dict[str, Any]
+    pending_recommendation: str | None
 
 
 def normalize_query_type(raw_label: str) -> QueryType:
@@ -116,7 +136,7 @@ def normalize_query_type(raw_label: str) -> QueryType:
     # Keep graph state constrained to QueryType values while handling noisy
     # punctuation or extra words from the router model response.
     match normalized:
-        case "structured" | "unstructured" | "out_of_scope":
+        case "structured" | "unstructured" | "out_of_scope" | "recommender":
             return normalized
         case _:
             # On uncertain labels, prefer in-scope routing over refusal.
@@ -261,10 +281,14 @@ def should_continue(state: AgentState) -> Literal["tools", "end"]:
     return "end"
 
 
-def after_router(state: AgentState) -> Literal["agent", "out_of_scope"]:
+def after_router(
+    state: AgentState,
+) -> Literal["agent", "out_of_scope", "recommender"]:
     """Branch after router classification."""
     if state.get("query_type") == "out_of_scope":
         return "out_of_scope"
+    if state.get("query_type") == "recommender":
+        return "recommender"
     return "agent"
 
 
@@ -272,6 +296,20 @@ def out_of_scope_node(state: AgentState) -> dict[str, Any]:
     """Return polite refusal for non-dataset questions."""
     _ = state
     return {"messages": [AIMessage(content=OUT_OF_SCOPE_MESSAGE)]}
+
+
+def recommender_node(state: AgentState) -> dict[str, Any]:
+    """Suggest a query without executing dataset tools."""
+    suggestion = generate_suggestion(
+        messages=list(state["messages"]),
+        user_profile=state.get("user_profile", {}),
+    )
+    return {
+        "messages": [
+            AIMessage(content=format_suggestion_response(suggestion))
+        ],
+        "pending_recommendation": suggestion,
+    }
 
 
 def build_graph(checkpointer: Any | None = None):
@@ -282,6 +320,7 @@ def build_graph(checkpointer: Any | None = None):
     workflow.add_node("agent", build_agent_node(tools))
     workflow.add_node("tools", ToolNode(tools))
     workflow.add_node("out_of_scope", out_of_scope_node)
+    workflow.add_node("recommender", recommender_node)
 
     workflow.add_edge(START, "router")
     workflow.add_conditional_edges(
@@ -290,6 +329,7 @@ def build_graph(checkpointer: Any | None = None):
         {
             "agent": "agent",
             "out_of_scope": "out_of_scope",
+            "recommender": "recommender",
         },
     )
     workflow.add_conditional_edges(
@@ -302,6 +342,7 @@ def build_graph(checkpointer: Any | None = None):
     )
     workflow.add_edge("tools", "agent")
     workflow.add_edge("out_of_scope", END)
+    workflow.add_edge("recommender", END)
     return workflow.compile(checkpointer=checkpointer)
 
 
@@ -325,23 +366,45 @@ def run_query(
     """Execute one query and collect reasoning steps for CLI display."""
     reset_filter()
     profile = load_user_profile(session_id)
+    pending_recommendation = load_pending_recommendation(session_id)
+    effective_query = query
 
-    if is_memory_question(query):
+    if pending_recommendation:
+        if is_confirmation(query):
+            effective_query = pending_recommendation
+            save_pending_recommendation(session_id, None)
+        elif is_declination(query):
+            save_pending_recommendation(session_id, None)
+            answer = "Recommendation cancelled. Ask me anything else."
+            if verbose:
+                print(f"\n[final answer]\n{answer}")
+            return answer, []
+        else:
+            refined = refine_suggestion(pending_recommendation, query)
+            save_pending_recommendation(session_id, refined)
+            answer = format_suggestion_response(refined)
+            if verbose:
+                print(f"\n[final answer]\n{answer}")
+            return answer, []
+
+    if is_memory_question(effective_query):
         answer = format_profile_for_prompt(profile)
         if verbose:
             print(f"\n[final answer]\n{answer}")
         return answer, []
 
     state: AgentState = {
-        "messages": [HumanMessage(content=query)],
+        "messages": [HumanMessage(content=effective_query)],
         "query_type": "structured",
         "iteration_count": 0,
         "session_id": session_id,
         "user_profile": profile,
+        "pending_recommendation": None,
     }
 
     steps: list[dict[str, str]] = []
     answer = ""
+    new_pending_recommendation: str | None = None
     config = {"configurable": {"thread_id": session_id}}
 
     for event in compiled_graph.stream(
@@ -349,6 +412,7 @@ def run_query(
         stream_mode="values",
         config=config,
     ):
+        new_pending_recommendation = event.get("pending_recommendation")
         messages = event.get("messages", [])
         if not messages:
             continue
@@ -388,12 +452,15 @@ def run_query(
                 )
                 print(f"\n[observation from {step['name']}]\n{preview}")
 
-    updated_profile = update_user_profile(
-        profile=profile,
-        user_text=query,
-        assistant_text=answer,
-    )
-    save_user_profile(session_id, updated_profile)
+    if new_pending_recommendation:
+        save_pending_recommendation(session_id, new_pending_recommendation)
+    else:
+        updated_profile = update_user_profile(
+            profile=profile,
+            user_text=effective_query,
+            assistant_text=answer,
+        )
+        save_user_profile(session_id, updated_profile)
 
     return answer, steps
 

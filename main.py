@@ -92,6 +92,8 @@ def run_interactive(session_id: str) -> None:
             profile = load_user_profile(session_id)
             print(f"\n{format_profile_for_prompt(profile)}\n")
             continue
+        if user_input.lower() in {"recommend", "suggest"}:
+            user_input = "What should I query next?"
 
         print("\nThinking...")
         answer, _ = run_query(
