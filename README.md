@@ -3,6 +3,8 @@
 LangGraph-based customer service dataset analyst with:
 - Task 1: router + tools + ReAct loop + reasoning trace
 - Task 2: persistent episodic memory and user profile memory
+- Task 3: FastMCP server for dataset-analysis tools
+- Bonus B: query recommender with suggest/refine/confirm flow
 
 ## Quick Start
 
@@ -22,7 +24,12 @@ NEBIUS_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
 NEBIUS_MAIN_MODEL=meta-llama/Llama-3.3-70B-Instruct
 NEBIUS_ROUTER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
 NEBIUS_PROFILE_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
+NEBIUS_RECOMMENDER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
 ```
+
+The main agent can use a stronger model, while router, profile extraction, and
+query recommendation can use smaller/faster models because they produce short,
+low-complexity outputs.
 
 ## CLI Usage
 
@@ -35,6 +42,7 @@ python main.py --session alice
 Interactive commands:
 - `profile` -> show stored profile for current session
 - `sessions` -> list all persisted sessions
+- `recommend` / `suggest` -> ask for a follow-up query recommendation
 - `exit` / `quit` -> stop
 
 ### Single query mode
@@ -48,6 +56,30 @@ python main.py --session alice --query "Summarize the FEEDBACK category."
 ```bash
 python main.py --list-sessions
 ```
+
+## Query Recommender (Bonus B)
+
+The recommender suggests one concrete next dataset query and pauses. It never
+executes a recommendation until you explicitly confirm it.
+
+Pending suggestions are stored per session under local `memory/` state, so the
+flow works across separate single-query CLI invocations with the same
+`--session`.
+
+```bash
+python main.py --session demo --query "What should I query next?"
+python main.py --session demo --query "make it about refunds"
+python main.py --session demo --query "yes, run it"
+```
+
+In interactive mode, you can also type `recommend` or `suggest` to start the
+same flow. Reply `no` or `cancel` to clear a pending recommendation.
+
+Validated flow:
+- suggest: no dataset tools are called
+- refine: updates the pending suggestion without execution
+- confirm: executes the pending suggestion through the normal tool loop
+- decline: clears the pending suggestion so a later `yes` cannot run it
 
 ## Memory Behavior (Task 2)
 
@@ -73,8 +105,12 @@ Run a quick smoke check:
 uv sync
 source .venv/bin/activate
 python -m py_compile agent.py memory.py main.py tools.py
+python -m py_compile recommender.py llm_config.py
 python main.py --session t2 --query "I prefer concise answers with examples."
 python main.py --session t2 --query "What do you remember about me?"
+python main.py --session rec-demo --query "What should I query next?"
+python main.py --session rec-demo --query "make it about refund examples"
+python main.py --session rec-demo --query "yes, run it"
 python main.py --list-sessions
 ```
 
