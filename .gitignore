@@ -203,6 +203,24 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# macOS Finder metadata
+.DS_Store
+
+# Local LangGraph Studio/runtime state
+.langgraph_api/
+
+# Local editor settings
+.vscode/
+
+# Local assignment/resource artifacts not required for implementation commits
+resource/*.pdf
+
+# Local exploration notebooks
+notebooks/*.ipynb
+
+# Local dataset cache files
+data/*.parquet
+
 # Ruff stuff:
 .ruff_cache/
 
@@ -216,3 +234,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+harel/*
