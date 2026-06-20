@@ -29,7 +29,7 @@ Primary success criteria:
 
 ## Important current-code constraints
 
-Before implementation, align with current root APIs (not `harel/` APIs):
+Before implementation, align with current root APIs only:
 
 1. `run_query()` signature in root `agent.py` is:
    - `run_query(compiled_graph, query, verbose=True, session_id="default")`
@@ -40,7 +40,7 @@ Before implementation, align with current root APIs (not `harel/` APIs):
    - `format_profile_for_prompt(profile)`
    - `list_sessions()`
    - `get_checkpointer()`
-4. Avoid relying on non-root helper names used in `harel/` (for example,
+4. Avoid relying on obsolete helper names from older code paths (for example,
    `format_profile_for_display` or older `run_query` signatures).
 
 Design implication:

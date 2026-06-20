@@ -25,8 +25,7 @@ The root implementation now supports:
 - Root-level recommendation helpers in `recommender.py`.
 - Interactive `recommend` and `suggest` aliases in `main.py`.
 
-The older `harel/` files remain a reference implementation only; the root code
-now contains the active recommender implementation.
+The root code now contains the active recommender implementation.
 
 Validated behavior:
 
