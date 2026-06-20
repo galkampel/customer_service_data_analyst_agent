@@ -1,7 +1,7 @@
 """LLM configuration helpers for Nebius Token Factory.
 
 This module centralizes model and connection resolution so agent components
-can request models by role (main agent, router) without hardcoding model IDs.
+can request models by role without hardcoding model IDs.
 """
 
 from __future__ import annotations
@@ -41,6 +41,7 @@ def resolve_model_for_role(role: str) -> str:
         "main": "NEBIUS_MAIN_MODEL",
         "router": "NEBIUS_ROUTER_MODEL",
         "profile": "NEBIUS_PROFILE_MODEL",
+        "recommender": "NEBIUS_RECOMMENDER_MODEL",
     }
     role_key = role_key_map.get(role)
     if role_key:
