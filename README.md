@@ -1,21 +1,25 @@
 # Customer Service Data Analyst Agent
 
-LangGraph-based customer service dataset analyst with:
-- Task 1: router + tools + ReAct loop + reasoning trace
-- Task 2: persistent episodic memory and user profile memory
-- Task 3: FastMCP server for dataset-analysis tools
-- Bonus B: query recommender with suggest/refine/confirm flow
+LangGraph-based data analyst agent for the Bitext Customer Service dataset.
 
-## Quick Start
+Implemented scope:
+- Task 1: router + ReAct tool loop + CLI reasoning trace + max-iteration guard
+- Task 2: persistent episodic memory + persistent user profile memory
+- Task 3: FastMCP server exposing dataset analysis tools
+- Streamlit chat UI with session switch, reasoning trace, and query recommendation flow
 
-1. Sync environment and activate venv:
+## 5-Minute Setup
+
+This repository uses `pyproject.toml` with pinned/explicit dependency versions.
+
+1. Install/sync dependencies and activate virtual environment:
 
 ```bash
 uv sync
 source .venv/bin/activate
 ```
 
-2. Configure environment variables in `.env`:
+2. Create `.env` in project root:
 
 ```bash
 NEBIUS_API_KEY=<your_key>
@@ -27,149 +31,158 @@ NEBIUS_PROFILE_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
 NEBIUS_RECOMMENDER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
 ```
 
-The main agent can use a stronger model, while router, profile extraction, and
-query recommendation can use smaller/faster models because they produce short,
-low-complexity outputs.
-
-## Streamlit UI (Bonus A)
-
-Launch the root Streamlit app:
+3. Quick syntax gate:
 
 ```bash
-uv sync
-source .venv/bin/activate
-streamlit run streamlit_app.py
+python -m py_compile agent.py memory.py main.py tools.py recommender.py llm_config.py mcp_server.py streamlit_app.py
 ```
 
-Implemented UI capabilities:
-- Sidebar API key input.
-- Session input + existing-session switch.
-- Profile panel for current session.
-- Chat transcript with reasoning trace expanders (tool calls + observations).
-- Recommender convenience button using backend suggest/refine/confirm flow.
-- Checkpoint-based transcript rehydration on session load.
-- Hardened error handling for graph initialization and query failures.
+## Model Choice and Rationale
 
-Validated UI checks:
-- `python -m py_compile streamlit_app.py`
-- headless startup succeeds:
+All LLM calls use Nebius Token Factory models.
 
-```bash
-streamlit run streamlit_app.py --server.headless true --server.port 8502
-```
+Role mapping:
+- Main agent (`NEBIUS_MAIN_MODEL`): `meta-llama/Llama-3.3-70B-Instruct`
+- Router (`NEBIUS_ROUTER_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
+- Profile extractor (`NEBIUS_PROFILE_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
+- Query recommender (`NEBIUS_RECOMMENDER_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
+- Fallback (`NEBIUS_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
 
-- live agent/UI backend smoke in one session:
-	- structured query
-	- unstructured summary
-	- out-of-scope refusal
-	- recommender suggest -> refine -> confirm
+Why this split:
+- Strong model on the main reasoning/tool-use loop improves answer quality.
+- Smaller/faster models on routing/profile/recommendation reduce latency and cost
+	for high-frequency, low-complexity subtasks.
+
+## Architecture Overview
+
+Core modules:
+- `data_loader.py`: dataset load/normalize/cache
+- `tools.py`: typed analysis tools with Pydantic schemas
+- `agent.py`: LangGraph router + agent/tool loop + recommender branch
+- `memory.py`: SQLite checkpoint memory + JSON profile/pending state
+- `recommender.py`: suggest/refine/confirm/decline helpers
+- `main.py`: CLI entrypoint
+- `mcp_server.py`: FastMCP server exposing tool subset
+- `streamlit_app.py`: chat UI wrapper with reasoning trace
+
+Graph behavior:
+- Router classifies each turn into `structured`, `unstructured`,
+	`out_of_scope`, or `recommender`.
+- Structured/unstructured route through ReAct tool loop.
+- Out-of-scope returns a polite dataset-only refusal.
+- Recommender suggests a query and executes only after user confirmation.
+
+## Tool Definitions
+
+Agent tools (from `tools.py`):
+- `list_categories`: categories with row counts
+- `list_intents(category)`: intents in one category
+- `count_rows()`: row count on working set/full dataset
+- `filter_by_intent(intent)`: set working set for downstream steps
+- `filter_by_category(category)`: set working set for downstream steps
+- `show_examples(n, category?, intent?)`: sample rows
+- `search_responses(keyword, n, use_working_set)`: literal keyword search
+- `get_intent_distribution(category?)`: counts + percentages
+- `summarize_category(category, n_examples)`: compact category summary
+
+Tools are exposed as `StructuredTool` objects with clear descriptions and
+Pydantic input schemas to improve model tool selection.
 
 ## CLI Usage
 
-### Interactive mode
+Interactive mode:
 
 ```bash
 python main.py --session alice
 ```
 
 Interactive commands:
-- `profile` -> show stored profile for current session
-- `sessions` -> list all persisted sessions
-- `recommend` / `suggest` -> ask for a follow-up query recommendation
-- `exit` / `quit` -> stop
+- `profile`: show stored profile for current session
+- `sessions`: list stored sessions
+- `recommend` / `suggest`: request a follow-up query suggestion
+- `exit` / `quit`: stop
 
-### Single query mode
+Single query mode:
 
 ```bash
 python main.py --session alice --query "Summarize the FEEDBACK category."
 ```
 
-### List stored sessions
+List sessions:
 
 ```bash
 python main.py --list-sessions
 ```
 
-## Query Recommender (Bonus B)
+## Memory Behavior
 
-The recommender suggests one concrete next dataset query and pauses. It never
-executes a recommendation until you explicitly confirm it.
+Episodic memory:
+- Conversation checkpoints: `memory/checkpoints.db`
+- Same `--session` restores same conversation state across restarts
 
-Pending suggestions are stored per session under local `memory/` state, so the
-flow works across separate single-query CLI invocations with the same
-`--session`.
+User profile memory:
+- Profile files: `memory/profiles/<session_id>.json`
+- Read with: `What do you remember about me?`
+
+Recommendation pending state:
+- Pending recommendation files:
+	`memory/pending_recommendations/<session_id>.json`
+
+## Query Recommendation Flow
+
+The agent supports suggest -> refine -> confirm -> execute.
+
+Example:
 
 ```bash
 python main.py --session demo --query "What should I query next?"
-python main.py --session demo --query "make it about refunds"
+python main.py --session demo --query "make it about refund examples"
 python main.py --session demo --query "yes, run it"
 ```
 
-In interactive mode, you can also type `recommend` or `suggest` to start the
-same flow. Reply `no` or `cancel` to clear a pending recommendation.
+Behavior guarantees:
+- Suggestion/refinement does not auto-execute dataset tools.
+- Decline clears pending state.
+- A later `yes` does not execute stale cancelled suggestions.
 
-Validated flow:
-- suggest: no dataset tools are called
-- refine: updates the pending suggestion without execution
-- confirm: executes the pending suggestion through the normal tool loop
-- decline: clears the pending suggestion so a later `yes` cannot run it
+## Streamlit Chat UI
 
-## Memory Behavior (Task 2)
-
-### Episodic memory
-- Conversation checkpoints are stored in `memory/checkpoints.db`.
-- Reusing the same `--session` restores thread state.
-- Runtime memory files are local artifacts and should not be committed.
-
-### Regression note
-- Unstructured summarization guards are scoped to the current user turn so
-	older checkpointed tool observations do not trigger premature finalization.
-
-### User profile memory
-- Profiles are stored at `memory/profiles/<session_id>.json`.
-- Durable facts are extracted from latest user+assistant exchange.
-- Ask: `What do you remember about me?` to read memory-backed profile facts.
-
-## Validation Commands
-
-Run a quick smoke check:
+Run:
 
 ```bash
-uv sync
-source .venv/bin/activate
-python -m py_compile agent.py memory.py main.py tools.py
-python -m py_compile recommender.py llm_config.py
-python -m py_compile streamlit_app.py
-python main.py --session t2 --query "I prefer concise answers with examples."
-python main.py --session t2 --query "What do you remember about me?"
-python main.py --session rec-demo --query "What should I query next?"
-python main.py --session rec-demo --query "make it about refund examples"
-python main.py --session rec-demo --query "yes, run it"
-streamlit run streamlit_app.py --server.headless true --server.port 8502
-python main.py --list-sessions
+streamlit run streamlit_app.py
 ```
 
-## MCP Server (Task 3)
+Implemented UI features:
+- Sidebar API key input
+- Session input + existing-session switch
+- Profile panel
+- Chat transcript with reasoning trace expanders
+- Recommendation convenience button
+- Session transcript rehydration from checkpoints
+- Error handling for graph init/query failures
 
-FastMCP is a Python framework that exposes normal Python functions as MCP
-tools over standard transports (here: `streamable-http`). It lets MCP
-clients call your dataset-analysis functions in a structured, tool-first way.
-
-### Start MCP server
+Headless startup check:
 
 ```bash
-uv sync
-source .venv/bin/activate
+streamlit run streamlit_app.py --server.headless true --server.port 8502
+```
+
+## MCP Server
+
+Run server:
+
+```bash
 python mcp_server.py
 ```
 
-Server settings:
-- host: `0.0.0.0`
-- port: `8000`
-- transport: `streamable-http`
+Settings:
+- Host: `0.0.0.0`
+- Port: `8000`
+- Transport: `streamable-http`
+- Endpoint: `http://localhost:8000/mcp`
 
-### Exposed MCP tools
-
+Exposed MCP tools:
 - `list_categories`
 - `get_intent_distribution`
 - `show_examples`
@@ -177,24 +190,7 @@ Server settings:
 - `summarize_category`
 - `search_responses`
 
-### Phase D smoke validation (local)
-
-```bash
-uv sync
-source .venv/bin/activate
-python -m py_compile mcp_server.py
-python - <<'PY'
-import mcp_server
-
-print(mcp_server.list_categories().splitlines()[0])
-print(mcp_server.get_intent_distribution(category="ACCOUNT").splitlines()[0])
-print(mcp_server.show_examples(n=2, category="REFUND").splitlines()[0])
-print(mcp_server.count_rows_for_intent("get_refund"))
-print(mcp_server.search_responses("refund", n=2).splitlines()[0])
-PY
-```
-
-### Client invocation example (Python MCP client)
+Client connection example (call one tool):
 
 ```python
 import asyncio
@@ -203,16 +199,42 @@ from mcp.client.streamable_http import streamablehttp_client
 
 
 async def main() -> None:
-	async with streamablehttp_client("http://localhost:8000/mcp") as (
-		read_stream,
-		write_stream,
-		_,
-	):
-		async with ClientSession(read_stream, write_stream) as session:
-			await session.initialize()
-			result = await session.call_tool("list_categories", {})
-			print(result.content[0].text)
+		async with streamablehttp_client("http://localhost:8000/mcp") as (
+				read_stream,
+				write_stream,
+				_,
+		):
+				async with ClientSession(read_stream, write_stream) as session:
+						await session.initialize()
+						result = await session.call_tool("list_categories", {})
+						print(result.content[0].text)
 
 
 asyncio.run(main())
+```
+
+## Smoke Test Bundle
+
+```bash
+source .venv/bin/activate
+
+# Task 1
+python main.py --session t1-structured --query "How many rows are in REFUND?"
+python main.py --session t1-unstructured --query "Summarize the FEEDBACK category."
+python main.py --session t1-oos --query "Who won the 2024 Champions League?"
+
+# Task 2
+python main.py --session t2-memory --query "I prefer concise answers with examples."
+python main.py --session t2-memory --query "What do you remember about me?"
+
+# Task 3
+python -m py_compile mcp_server.py
+python - <<'PY'
+import mcp_server
+print(mcp_server.list_categories().splitlines()[0])
+print(mcp_server.get_intent_distribution(category="ACCOUNT").splitlines()[0])
+PY
+
+# UI startup
+streamlit run streamlit_app.py --server.headless true --server.port 8502
 ```
