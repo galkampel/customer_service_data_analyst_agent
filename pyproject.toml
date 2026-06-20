@@ -20,5 +20,6 @@ dependencies = [
     "pandas>=2.2.3",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
+    "streamlit>=1.46.0",
     "torch>=2.12.0",
 ]
