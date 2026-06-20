@@ -221,6 +221,9 @@ notebooks/*.ipynb
 # Local dataset cache files
 data/*.parquet
 
+# Local Task 2 memory state (checkpoints and per-session profiles)
+memory/
+
 # Ruff stuff:
 .ruff_cache/
 
