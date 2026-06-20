@@ -31,6 +31,39 @@ The main agent can use a stronger model, while router, profile extraction, and
 query recommendation can use smaller/faster models because they produce short,
 low-complexity outputs.
 
+## Streamlit UI (Bonus A)
+
+Launch the root Streamlit app:
+
+```bash
+uv sync
+source .venv/bin/activate
+streamlit run streamlit_app.py
+```
+
+Implemented UI capabilities:
+- Sidebar API key input.
+- Session input + existing-session switch.
+- Profile panel for current session.
+- Chat transcript with reasoning trace expanders (tool calls + observations).
+- Recommender convenience button using backend suggest/refine/confirm flow.
+- Checkpoint-based transcript rehydration on session load.
+- Hardened error handling for graph initialization and query failures.
+
+Validated UI checks:
+- `python -m py_compile streamlit_app.py`
+- headless startup succeeds:
+
+```bash
+streamlit run streamlit_app.py --server.headless true --server.port 8502
+```
+
+- live agent/UI backend smoke in one session:
+	- structured query
+	- unstructured summary
+	- out-of-scope refusal
+	- recommender suggest -> refine -> confirm
+
 ## CLI Usage
 
 ### Interactive mode
@@ -106,11 +139,13 @@ uv sync
 source .venv/bin/activate
 python -m py_compile agent.py memory.py main.py tools.py
 python -m py_compile recommender.py llm_config.py
+python -m py_compile streamlit_app.py
 python main.py --session t2 --query "I prefer concise answers with examples."
 python main.py --session t2 --query "What do you remember about me?"
 python main.py --session rec-demo --query "What should I query next?"
 python main.py --session rec-demo --query "make it about refund examples"
 python main.py --session rec-demo --query "yes, run it"
+streamlit run streamlit_app.py --server.headless true --server.port 8502
 python main.py --list-sessions
 ```
 

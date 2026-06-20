@@ -281,7 +281,7 @@ Task 3:
 - [ ] README includes client connection example and tool invocation.
 
 Bonus A:
-- [ ] Streamlit UI works with reasoning trace and session ID switch.
+- [x] Streamlit UI works with reasoning trace and session ID switch.
 
 Bonus B:
 - [x] Suggest/refine/confirm query recommender works without auto-execution.
@@ -316,6 +316,11 @@ Suggested test set:
 - Recommender:
   - "What should I query next?" -> refine -> confirm -> execute.
    - Decline clears the pending suggestion and a later "yes" does not execute it.
+
+- Streamlit UI:
+   - Headless startup succeeds.
+   - Session switching and transcript rehydration work from checkpoints.
+   - Reasoning traces are displayed for assistant responses.
 
 Exit condition for implementation:
 - All checklist items pass.
