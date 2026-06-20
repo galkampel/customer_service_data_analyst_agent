@@ -77,3 +77,71 @@ python main.py --session t2 --query "I prefer concise answers with examples."
 python main.py --session t2 --query "What do you remember about me?"
 python main.py --list-sessions
 ```
+
+## MCP Server (Task 3)
+
+FastMCP is a Python framework that exposes normal Python functions as MCP
+tools over standard transports (here: `streamable-http`). It lets MCP
+clients call your dataset-analysis functions in a structured, tool-first way.
+
+### Start MCP server
+
+```bash
+uv sync
+source .venv/bin/activate
+python mcp_server.py
+```
+
+Server settings:
+- host: `0.0.0.0`
+- port: `8000`
+- transport: `streamable-http`
+
+### Exposed MCP tools
+
+- `list_categories`
+- `get_intent_distribution`
+- `show_examples`
+- `count_rows_for_intent`
+- `summarize_category`
+- `search_responses`
+
+### Phase D smoke validation (local)
+
+```bash
+uv sync
+source .venv/bin/activate
+python -m py_compile mcp_server.py
+python - <<'PY'
+import mcp_server
+
+print(mcp_server.list_categories().splitlines()[0])
+print(mcp_server.get_intent_distribution(category="ACCOUNT").splitlines()[0])
+print(mcp_server.show_examples(n=2, category="REFUND").splitlines()[0])
+print(mcp_server.count_rows_for_intent("get_refund"))
+print(mcp_server.search_responses("refund", n=2).splitlines()[0])
+PY
+```
+
+### Client invocation example (Python MCP client)
+
+```python
+import asyncio
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+
+async def main() -> None:
+	async with streamablehttp_client("http://localhost:8000/mcp") as (
+		read_stream,
+		write_stream,
+		_,
+	):
+		async with ClientSession(read_stream, write_stream) as session:
+			await session.initialize()
+			result = await session.call_tool("list_categories", {})
+			print(result.content[0].text)
+
+
+asyncio.run(main())
+```
