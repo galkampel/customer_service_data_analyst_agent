@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task 3 — FastMCP Server</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f232f;
+    --border: #2b303d;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee0b8;
+    --warn: #f5b971;
+    --pink: #f08fc0;
+    --code-bg: #11141b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  header {
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #161a24, #0f1117);
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: .2px; }
+  header p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  nav.tabs {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 12px 20px; background: rgba(15,17,23,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 15px; font-size: 13.5px; cursor: pointer; transition: .15s;
+  }
+  nav.tabs button:hover { color: var(--text); border-color: #3a4254; }
+  nav.tabs button.active { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  section.screen { display: none; padding: 30px 0 70px; }
+  section.screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h2 { font-size: 21px; margin: 0 0 14px; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; color: var(--accent-2); }
+  p { margin: 10px 0; }
+  .lead { color: var(--muted); font-size: 15px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; margin: 14px 0;
+  }
+  .card.tight { padding: 14px 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  code, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: #cdd6e4; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px;
+    color: #cdd6e4;
+  }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.req { background: #1c3350; color: #8fc1ff; }
+  .pill.extra { background: #1d3b30; color: #8fe6c0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .4px; }
+  td code { color: var(--accent); }
+  .note { border-left: 3px solid var(--accent); background: var(--panel-2); padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+  .note.warn { border-color: var(--warn); }
+  .note.good { border-color: var(--accent-2); }
+  .essential { color: var(--accent-2); font-weight: 600; }
+  .tool-name { color: var(--accent); font-weight: 600; font-family: "SF Mono", Menlo, monospace; font-size: 13.5px; }
+  .filepath { color: var(--warn); font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+
+  /* diagram */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 18px 0; }
+  .node {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 18px; min-width: 160px; text-align: center; font-size: 14px;
+  }
+  .node .sub { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .node.client { border-color: var(--accent); }
+  .node.server { border-color: var(--accent-2); }
+  .node.data { border-color: var(--warn); }
+  .arrow { color: var(--muted); font-size: 18px; line-height: 1.1; padding: 4px 0; }
+  .step { counter-increment: step; }
+  ol.steps { padding-left: 0; list-style: none; counter-reset: step; }
+  ol.steps > li { position: relative; padding: 4px 0 4px 40px; margin: 10px 0; }
+  ol.steps > li::before {
+    content: counter(step); counter-increment: step;
+    position: absolute; left: 0; top: 4px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #0b1020; font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  footer { color: var(--muted); font-size: 12.5px; padding: 24px 0 40px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Task 3 — FastMCP Server</h1>
+    <p>Exposing the dataset analysis tools to any MCP client over streamable-HTTP — stateless and concurrency-safe</p>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="problem" class="active">1 · Problem</button>
+  <button data-tab="mcp">2 · What Is MCP?</button>
+  <button data-tab="fastmcp">3 · Building It with FastMCP</button>
+  <button data-tab="tools">4 · Exposed Tools</button>
+  <button data-tab="stateless">5 · Why Stateless</button>
+  <button data-tab="run">6 · Run &amp; Connect</button>
+</nav>
+
+<div class="wrap">
+
+<!-- ============ SCREEN 1: PROBLEM ============ -->
+<section class="screen active" id="problem">
+  <h2>The Problem</h2>
+  <p class="lead">
+    Tasks 1–2 built a capable analyst, but its tools are locked <em>inside</em> our Python process. Task 3
+    publishes a subset of those tools over the <strong>Model Context Protocol (MCP)</strong> so that
+    <em>any</em> MCP-aware client — Claude Desktop, another agent, a custom script — can call them
+    remotely.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:8px">What Task 3 asks for</h3>
+    <ul>
+      <li>A <strong>FastMCP server</strong> that runs successfully.</li>
+      <li>At least <strong>3 tools</strong> exposed over MCP.</li>
+      <li>Tools must be <strong>stateless</strong> and safe for concurrent clients.</li>
+      <li>README with startup + a client invocation example.</li>
+    </ul>
+  </div>
+
+  <h3>The core design tension</h3>
+  <div class="note warn">
+    Our <span class="filepath">tools.py</span> tools share a mutable <em>working set</em>
+    (<code class="inline">_STATE["filtered_df"]</code>) so the agent can chain <code class="inline">filter →
+    count</code>. That's great for one in-process agent turn, but <strong>fatal</strong> for an MCP server
+    where many clients call concurrently — one client's filter would corrupt another's results. Task 3's
+    real work is re-exposing this functionality <em>without</em> shared state.
+  </div>
+
+  <div class="note good">
+    The whole server is a single file: <span class="filepath">mcp_server.py</span>.
+  </div>
+</section>
+
+<!-- ============ SCREEN 2: WHAT IS MCP ============ -->
+<section class="screen" id="mcp">
+  <h2>What Is an MCP Server?</h2>
+  <p class="lead">
+    <strong>MCP (Model Context Protocol)</strong> is an open, standardized protocol for connecting LLM
+    applications to external capabilities — tools, data, and prompts. Think of it as a <em>universal
+    adapter</em>: instead of every model integrating with every tool in a bespoke way, both speak MCP.
+  </p>
+
+  <div class="grid2">
+    <div class="card tight">
+      <h3 style="margin-top:4px">The two roles</h3>
+      <ul>
+        <li><strong>MCP server</strong> — exposes capabilities (our case: dataset analysis tools).</li>
+        <li><strong>MCP client</strong> — an LLM app/agent that discovers and calls them.</li>
+      </ul>
+    </div>
+    <div class="card tight">
+      <h3 style="margin-top:4px">What a server can expose</h3>
+      <ul>
+        <li><strong>Tools</strong> — callable functions (what we expose).</li>
+        <li><strong>Resources</strong> — readable data/context.</li>
+        <li><strong>Prompts</strong> — reusable prompt templates.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>How a client talks to a server</h3>
+  <div class="flow">
+    <div class="node client">MCP Client<span class="sub">Claude Desktop, agent, script</span></div>
+    <div class="arrow">↓ &nbsp; 1 · <code class="inline">initialize</code> (handshake)</div>
+    <div class="arrow">↓ &nbsp; 2 · <code class="inline">tools/list</code> → discover available tools + schemas</div>
+    <div class="arrow">↓ &nbsp; 3 · <code class="inline">tools/call</code> → invoke one with arguments</div>
+    <div class="node server">MCP Server<span class="sub">customer-service-analyst</span></div>
+    <div class="arrow">↓ &nbsp; runs the function</div>
+    <div class="node data">dataset (26,872 rows)</div>
+  </div>
+
+  <div class="note">
+    <strong>Why this matters:</strong> the client <em>discovers</em> tools at runtime from the schemas the
+    server advertises — it doesn't need to be coded against our specific functions ahead of time. The
+    function name, docstring, and type hints <em>become</em> the public contract.
+  </div>
+
+  <h3>Transport</h3>
+  <p>
+    MCP runs over a transport. Common choices are <strong>stdio</strong> (local subprocess) and
+    <strong>streamable-HTTP</strong> (networked). We use <strong>streamable-HTTP</strong> so the server is
+    reachable as a normal network endpoint at <code class="inline">http://localhost:8000/mcp</code>,
+    supporting remote and concurrent clients.
+  </p>
+</section>
+
+<!-- ============ SCREEN 3: BUILDING WITH FASTMCP ============ -->
+<section class="screen" id="fastmcp">
+  <h2>Creating a Server with FastMCP</h2>
+  <p class="lead">
+    <strong>FastMCP</strong> is a lightweight Python framework that turns plain functions into MCP tools
+    with a decorator. It handles the protocol, schema generation, and transport — you write ordinary
+    Python. Building the server is three small steps.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <strong>Instantiate the server</strong> — give it a name and client-facing instructions.
+      <pre>from fastmcp import FastMCP
+
+mcp = FastMCP(
+    name="customer-service-analyst",
+    instructions=(
+        "Use these tools to analyze the Bitext customer service dataset. "
+        "All exposed tools are stateless and safe for concurrent clients."
+    ),
+)</pre>
+    </li>
+    <li>
+      <strong>Register tools with <code class="inline">@mcp.tool()</code></strong> — the decorator inspects
+      the function's <em>name</em>, <em>type hints</em>, and <em>docstring</em> and auto-generates the MCP
+      tool schema the client will see. No manual schema writing.
+      <pre>@mcp.tool()
+def list_categories() -> str:
+    """List all dataset categories with row counts."""
+    return list_categories_impl()
+
+@mcp.tool()
+def get_intent_distribution(category: Optional[str] = None) -> str:
+    """Return intent distribution (optionally for one category)."""
+    return get_intent_distribution_impl(category=category)</pre>
+    </li>
+    <li>
+      <strong>Run it on a transport</strong> — one call starts the server.
+      <pre>if __name__ == "__main__":
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)</pre>
+    </li>
+  </ol>
+
+  <div class="note good">
+    <strong>That's the whole pattern.</strong> The docstring becomes the tool description the model reads
+    to decide <em>when</em> to call it; the type hints (<code class="inline">category: Optional[str] =
+    None</code>) become the input schema and defaults. Good names + docstrings + hints = a good MCP tool.
+  </div>
+
+  <h3>Architecture choice: thin MCP layer over existing logic</h3>
+  <p>
+    The MCP tools don't re-implement analysis. Where a function is already pure, the decorated tool is a
+    <strong>one-line passthrough</strong> to the <span class="filepath">tools.py</span> implementation
+    (imported as <code class="inline">..._impl</code>). Only where the original relied on shared state do we
+    add a stateless wrapper (Screen 5). This keeps a single source of truth for the analysis logic.
+  </p>
+</section>
+
+<!-- ============ SCREEN 4: EXPOSED TOOLS ============ -->
+<section class="screen" id="tools">
+  <h2>The Six Exposed Tools</h2>
+  <p class="lead">
+    Task 3 requires a minimum of three; we expose six. Each returns a concise text string suitable for an
+    MCP client to display or feed back to a model.
+  </p>
+
+  <table>
+    <tr><th>Tool</th><th>Backing</th><th>Notes</th></tr>
+    <tr>
+      <td><span class="tool-name">list_categories</span><br><span class="pill req">required</span></td>
+      <td>passthrough → <code class="inline">tools.list_categories</code></td>
+      <td>Already pure; direct reuse.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">get_intent_distribution</span><br><span class="pill req">required</span></td>
+      <td>passthrough → <code class="inline">tools.get_intent_distribution</code></td>
+      <td>Optional <code class="inline">category</code> filter.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">show_examples</span><br><span class="pill req">required</span></td>
+      <td><strong>stateless wrapper</strong></td>
+      <td>Reimplemented to filter the full dataset per call (no shared <code class="inline">_STATE</code>); deterministic sampling.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">count_rows_for_intent</span><br><span class="pill extra">extra</span></td>
+      <td><strong>stateless wrapper</strong></td>
+      <td>One-shot direct count for one intent — replaces the agent's <code class="inline">filter → count</code> chain with a single safe call.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">summarize_category</span><br><span class="pill extra">extra</span></td>
+      <td>passthrough → <code class="inline">tools.summarize_category</code></td>
+      <td>Already computes from full dataset; direct reuse.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">search_responses</span><br><span class="pill extra">extra</span></td>
+      <td>passthrough, <code class="inline">use_working_set=False</code></td>
+      <td>Forced full-dataset search so it can't depend on a prior filter.</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    Every tool validates at the boundary: trims strings, rejects empty required values with helpful text
+    (e.g. <em>"Intent cannot be empty."</em>), bounds integers (<code class="inline">n</code> capped to a
+    safe range), and normalizes casing — returning <strong>actionable error text instead of stack
+    traces</strong>.
+  </div>
+</section>
+
+<!-- ============ SCREEN 5: WHY STATELESS ============ -->
+<section class="screen" id="stateless">
+  <h2>Why Stateless Wrappers Are Essential</h2>
+  <p class="lead">
+    The single most important design rule of Task 3: <strong>MCP tools must not share mutable
+    state</strong>. Here's the concrete reason and how it's solved.</p>
+
+  <h3>The hazard</h3>
+  <div class="card">
+    <p>
+      In <span class="filepath">tools.py</span>, <code class="inline">filter_by_category()</code> writes to
+      a module-level <code class="inline">_STATE["filtered_df"]</code>, and <code class="inline">count_rows()</code>
+      / <code class="inline">show_examples()</code> read it. For a single agent turn that's a feature. But an
+      MCP server handles <strong>concurrent clients</strong>:
+    </p>
+    <pre>Client A → filter REFUND   ┐
+                           ├─ shared _STATE  ← race condition
+Client B → filter SHIPPING ┘
+Client A → count_rows()    → gets SHIPPING's count.  WRONG.</pre>
+    <p>Shared in-process state means one caller can silently corrupt another's results.</p>
+  </div>
+
+  <h3>The fix</h3>
+  <div class="grid2">
+    <div class="card tight">
+      <strong>Passthrough where already pure.</strong> <code class="inline">list_categories</code>,
+      <code class="inline">get_intent_distribution</code>, and <code class="inline">summarize_category</code>
+      compute from the full dataset every call — reused directly.
+    </div>
+    <div class="card tight">
+      <strong>Wrap where state was used.</strong> <code class="inline">show_examples</code> and
+      <code class="inline">count_rows_for_intent</code> are reimplemented to apply filters to a fresh
+      <code class="inline">load_dataset()</code> view each call — never touching <code class="inline">_STATE</code>.
+    </div>
+    <div class="card tight">
+      <strong>Force stateless flags.</strong> <code class="inline">search_responses</code> is always called
+      with <code class="inline">use_working_set=False</code>, guaranteeing full-dataset behavior.
+    </div>
+    <div class="card tight">
+      <strong>Deterministic results.</strong> Sampling uses a fixed <code class="inline">random_state=42</code>,
+      so identical calls return identical output — predictable for clients and tests.
+    </div>
+  </div>
+
+  <div class="note good">
+    Net result: every MCP tool is a <strong>pure function of its arguments</strong>. Any number of clients
+    can call in any order with no interference — exactly the concurrency-safety Task 3 demands. The
+    in-process agent (Task 1) keeps its stateful chaining; the two worlds stay decoupled.
+  </div>
+</section>
+
+<!-- ============ SCREEN 6: RUN & CONNECT ============ -->
+<section class="screen" id="run">
+  <h2>Run &amp; Connect</h2>
+
+  <h3>Start the server</h3>
+  <pre>uv sync
+source .venv/bin/activate
+python mcp_server.py</pre>
+  <p>Settings (from <span class="filepath">mcp_server.py</span>):</p>
+  <table>
+    <tr><th>Setting</th><th>Value</th></tr>
+    <tr><td>Host</td><td><code class="inline">0.0.0.0</code></td></tr>
+    <tr><td>Port</td><td><code class="inline">8000</code></td></tr>
+    <tr><td>Transport</td><td><code class="inline">streamable-http</code></td></tr>
+    <tr><td>Endpoint</td><td><code class="inline">http://localhost:8000/mcp</code></td></tr>
+  </table>
+
+  <h3>Connect a client (call one tool)</h3>
+  <pre>import asyncio
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+async def main():
+    async with streamablehttp_client("http://localhost:8000/mcp") as (r, w, _):
+        async with ClientSession(r, w) as session:
+            await session.initialize()
+            result = await session.call_tool("list_categories", {})
+            print(result.content[0].text)
+
+asyncio.run(main())</pre>
+
+  <h3>Quick offline smoke check (no server needed)</h3>
+  <pre>python -m py_compile mcp_server.py
+python - &lt;&lt;'PY'
+import mcp_server
+print(mcp_server.list_categories().splitlines()[0])
+print(mcp_server.get_intent_distribution(category="ACCOUNT").splitlines()[0])
+PY</pre>
+
+  <div class="note">
+    Tool checks to confirm behavior: <code class="inline">list_categories()</code> →
+    category rows · <code class="inline">show_examples(category='REFUND', n=2)</code> → 2 rows ·
+    <code class="inline">count_rows_for_intent(intent='get_refund')</code> → non-zero ·
+    <code class="inline">search_responses(keyword='refund', n=3)</code> → matches.
+  </div>
+</section>
+
+<footer class="wrap">
+  Task 3 summary · FastMCP Server · core file: <code class="inline">mcp_server.py</code> ·
+  reuses analysis logic from <code class="inline">tools.py</code> and <code class="inline">data_loader.py</code>.
+</footer>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const screens = document.querySelectorAll('section.screen');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.tab;
+    tabs.forEach(b => b.classList.toggle('active', b === btn));
+    screens.forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }));
+</script>
+</body>
+</html>

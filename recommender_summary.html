@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Query Recommender — Summary</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f232f;
+    --border: #2b303d;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee0b8;
+    --warn: #f5b971;
+    --pink: #f08fc0;
+    --code-bg: #11141b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  header {
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #161a24, #0f1117);
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: .2px; }
+  header p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  nav.tabs {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 12px 20px; background: rgba(15,17,23,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 15px; font-size: 13.5px; cursor: pointer; transition: .15s;
+  }
+  nav.tabs button:hover { color: var(--text); border-color: #3a4254; }
+  nav.tabs button.active { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  section.screen { display: none; padding: 30px 0 70px; }
+  section.screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h2 { font-size: 21px; margin: 0 0 14px; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; color: var(--accent-2); }
+  p { margin: 10px 0; }
+  .lead { color: var(--muted); font-size: 15px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; margin: 14px 0;
+  }
+  .card.tight { padding: 14px 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  code, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: #cdd6e4; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px;
+    color: #cdd6e4;
+  }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.suggest { background: #1c3350; color: #8fc1ff; }
+  .pill.refine { background: #45371b; color: #f5cd8a; }
+  .pill.confirm { background: #1d3b30; color: #8fe6c0; }
+  .pill.decline { background: #4a2230; color: #f3a0bf; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .4px; }
+  td code { color: var(--accent); }
+  .note { border-left: 3px solid var(--accent); background: var(--panel-2); padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+  .note.warn { border-color: var(--warn); }
+  .note.good { border-color: var(--accent-2); }
+  .essential { color: var(--accent-2); font-weight: 600; }
+  .func { color: var(--accent); font-weight: 600; font-family: "SF Mono", Menlo, monospace; font-size: 13.5px; }
+  .filepath { color: var(--warn); font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+
+  /* state machine diagram */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 18px 0; }
+  .node {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 18px; min-width: 170px; text-align: center; font-size: 14px;
+  }
+  .node .sub { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .node.start { border-color: var(--accent); }
+  .node.pending { border-color: var(--warn); }
+  .node.exec { border-color: var(--accent-2); }
+  .node.term { border-color: #5a6275; color: var(--muted); }
+  .arrow { color: var(--muted); font-size: 18px; line-height: 1.1; padding: 4px 0; }
+  .branch { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .branch .col { display: flex; flex-direction: column; align-items: center; max-width: 220px; }
+  /* chat bubbles */
+  .chat { margin: 12px 0; }
+  .bubble { border-radius: 12px; padding: 10px 14px; margin: 8px 0; max-width: 80%; font-size: 14px; }
+  .bubble.user { background: #1c2740; border: 1px solid #2c3b5c; margin-left: auto; }
+  .bubble.bot { background: var(--panel-2); border: 1px solid var(--border); }
+  .bubble .who { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .4px; }
+  footer { color: var(--muted); font-size: 12.5px; padding: 24px 0 40px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Query Recommender</h1>
+    <p>Suggest → Refine → Confirm → Execute — a consent-gated "what should I ask next?" workflow</p>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="problem" class="active">1 · Problem</button>
+  <button data-tab="flow">2 · The Flow</button>
+  <button data-tab="generate">3 · Suggest &amp; Refine</button>
+  <button data-tab="consent">4 · Confirm / Decline</button>
+  <button data-tab="persist">5 · Persistence &amp; Safety</button>
+  <button data-tab="run">6 · Run &amp; Verify</button>
+</nav>
+
+<div class="wrap">
+
+<!-- ============ SCREEN 1: PROBLEM ============ -->
+<section class="screen active" id="problem">
+  <h2>The Problem</h2>
+  <p class="lead">
+    A data analyst doesn't always know the <em>next</em> good question. The recommender helps the user
+    decide what to ask next — but with one hard rule: it <strong>must never run a suggested query until the
+    user explicitly confirms</strong>.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:8px">The four-step contract</h3>
+    <ol>
+      <li>User asks for a recommendation.</li>
+      <li>Agent suggests <strong>one concrete</strong> dataset query — and stops.</li>
+      <li>User may <strong>refine</strong>, <strong>decline</strong>, or <strong>confirm</strong>.</li>
+      <li>Agent runs the query <strong>only after clear confirmation</strong>.</li>
+    </ol>
+  </div>
+
+  <h3>Why this is more than "just call the LLM"</h3>
+  <div class="grid2">
+    <div class="card tight"><strong>Consent gating.</strong> Suggesting and refining must call <em>zero</em> dataset tools — no side effects until "yes".</div>
+    <div class="card tight"><strong>Cross-turn state.</strong> The pending suggestion must survive between separate CLI invocations / process restarts.</div>
+    <div class="card tight"><strong>Robust yes/no detection.</strong> "yes" should confirm, but "yesterday" must not; "no" declines, but "knowledge" must not.</div>
+    <div class="card tight"><strong>No stale execution.</strong> A declined suggestion must not be revived by a later "yes".</div>
+  </div>
+
+  <div class="note good">
+    Logic lives in <span class="filepath">recommender.py</span> (pure orchestration — no dataset tools),
+    wired into the graph + cross-turn handling in <span class="filepath">agent.py</span>, with the
+    pending state persisted via <span class="filepath">memory.py</span>.
+  </div>
+</section>
+
+<!-- ============ SCREEN 2: THE FLOW ============ -->
+<section class="screen" id="flow">
+  <h2>The Flow — a Consent State Machine</h2>
+  <p class="lead">
+    Two entry points cooperate: the graph's <code class="inline">recommender</code> route produces the
+    first suggestion; after that, <code class="inline">run_query()</code> intercepts each turn <em>before</em>
+    the graph to handle the pending suggestion.
+  </p>
+
+  <div class="flow">
+    <div class="node start">User: "What should I query next?"</div>
+    <div class="arrow">↓ &nbsp; router classifies <span class="pill suggest">recommender</span></div>
+    <div class="node pending">recommender_node → generate_suggestion()<span class="sub">no dataset tools called</span></div>
+    <div class="arrow">↓ &nbsp; save pending suggestion to disk</div>
+    <div class="node pending">PENDING state<span class="sub">"Would you like me to run this?"</span></div>
+    <div class="arrow">↓ &nbsp; next turn intercepted by run_query()</div>
+    <div class="branch">
+      <div class="col">
+        <span class="pill confirm">confirm</span>
+        <div class="arrow">↓</div>
+        <div class="node exec">swap query ← pending<br>run normal tool loop<span class="sub">grounded answer</span></div>
+        <div class="arrow">↓</div>
+        <div class="node term">clear pending → END</div>
+      </div>
+      <div class="col">
+        <span class="pill refine">refine</span>
+        <div class="arrow">↓</div>
+        <div class="node pending">refine_suggestion()<br>stays PENDING<span class="sub">no tools</span></div>
+        <div class="arrow">↺ loop back to PENDING</div>
+      </div>
+      <div class="col">
+        <span class="pill decline">decline</span>
+        <div class="arrow">↓</div>
+        <div class="node term">clear pending<br>cancellation msg<span class="sub">no tools</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Key architectural point:</strong> the <em>first</em> suggestion comes from the graph node; every
+    <em>subsequent</em> turn is decided by <code class="inline">run_query()</code> reading the persisted
+    pending state — so confirm/refine/decline work even across separate process runs.
+  </div>
+</section>
+
+<!-- ============ SCREEN 3: SUGGEST & REFINE ============ -->
+<section class="screen" id="generate">
+  <h2>Generating &amp; Refining Suggestions</h2>
+  <p class="lead">
+    Both use the small <code class="inline">recommender</code>-role model at
+    <code class="inline">temperature=0.3</code> — cheap, fast, and low-risk because the output is just one
+    short query string, never an executed action.
+  </p>
+
+  <h3><span class="func">generate_suggestion(messages, user_profile)</span></h3>
+  <div class="card">
+    <p>Builds a context-aware prompt from three inputs and asks for exactly one query:</p>
+    <ul>
+      <li><strong>Valid categories</strong> — the 11 dataset categories, so suggestions stay executable.</li>
+      <li><strong>User profile</strong> — via <code class="inline">format_profile_for_prompt()</code>, so
+        suggestions reflect known preferences (Task 2 tie-in).</li>
+      <li><strong>Recent history</strong> — last 6 messages, compacted, so the suggestion builds on the
+        conversation.</li>
+    </ul>
+    <p>The prompt insists on <em>"only the suggested query text — no markdown, preamble, or explanation,"</em>
+      and <code class="inline">_clean_suggestion()</code> strips stray quotes/whitespace.</p>
+  </div>
+
+  <h3><span class="func">refine_suggestion(pending, refinement)</span></h3>
+  <div class="card">
+    <p>Takes the current pending query + the user's change request and returns one revised query. The
+      suggestion stays pending — refinement never executes anything.</p>
+    <div class="chat">
+      <div class="bubble bot"><span class="who">pending</span>"Compare top intents in REFUND and PAYMENT…"</div>
+      <div class="bubble user"><span class="who">user</span>"make it about delivery instead"</div>
+      <div class="bubble bot"><span class="who">refined (still pending)</span>"Compare the top intents in DELIVERY and SHIPPING…"</div>
+    </div>
+  </div>
+
+  <div class="note good">
+    <strong>Deterministic fallback.</strong> If the LLM/API is unavailable, both functions degrade
+    gracefully: generation returns a fixed fallback query
+    (<em>"What is the distribution of intents in the REFUND category?"</em>) and refinement returns the
+    unchanged pending query — so the CLI stays usable even with no API key.
+  </div>
+</section>
+
+<!-- ============ SCREEN 4: CONFIRM / DECLINE ============ -->
+<section class="screen" id="consent">
+  <h2>Detecting Confirmation &amp; Declination</h2>
+  <p class="lead">
+    Consent detection is <strong>rule-based, not an LLM call</strong> — it must be fast, deterministic, and
+    free of false positives. This is the gate that decides whether real dataset tools run.
+  </p>
+
+  <h3>Why rules instead of a model</h3>
+  <div class="grid2">
+    <div class="card tight"><strong>Determinism.</strong> "yes" must <em>always</em> mean yes — no temperature, no ambiguity on the step that triggers execution.</div>
+    <div class="card tight"><strong>Zero latency/cost.</strong> A token-set check is instant; no extra API round-trip on every turn.</div>
+  </div>
+
+  <h3>How it avoids false positives</h3>
+  <div class="card">
+    <p>
+      Matching uses <strong>word-boundary tokenization</strong> (<code class="inline">\b\w+\b</code>), not
+      naive substring search — so an embedded "yes" inside "yesterday" can't trigger confirmation:
+    </p>
+    <pre>def is_confirmation(text):
+    tokens = _word_tokens(text)                       # {"yes","run","it"}
+    return bool(tokens & CONFIRM_KEYWORDS) or _contains_phrase(text, CONFIRM_PHRASES)</pre>
+    <table>
+      <tr><th>Input</th><th>Result</th><th>Why</th></tr>
+      <tr><td><code class="inline">"yes, run it"</code></td><td><span class="pill confirm">confirm</span></td><td>token <code class="inline">yes</code> ∈ keywords</td></tr>
+      <tr><td><code class="inline">"go ahead"</code></td><td><span class="pill confirm">confirm</span></td><td>bounded phrase match</td></tr>
+      <tr><td><code class="inline">"yesterday"</code></td><td>— no match</td><td>single token, not <code class="inline">yes</code></td></tr>
+      <tr><td><code class="inline">"no thanks"</code></td><td><span class="pill decline">decline</span></td><td>token <code class="inline">no</code> ∈ decline set</td></tr>
+      <tr><td><code class="inline">"never mind"</code></td><td><span class="pill decline">decline</span></td><td>bounded phrase match</td></tr>
+      <tr><td><code class="inline">"knowledge"</code></td><td>— no match</td><td>contains "no" but as substring only</td></tr>
+    </table>
+  </div>
+
+  <div class="note">
+    Keyword sets (<code class="inline">yes/yeah/sure/ok/proceed…</code>,
+    <code class="inline">no/nope/cancel/skip/stop…</code>) plus phrase lists
+    (<code class="inline">"do it"</code>, <code class="inline">"run it"</code>,
+    <code class="inline">"forget it"</code>, <code class="inline">"not now"</code>) cover natural replies
+    without overreaching.
+  </div>
+</section>
+
+<!-- ============ SCREEN 5: PERSISTENCE & SAFETY ============ -->
+<section class="screen" id="persist">
+  <h2>Cross-Turn Persistence &amp; Safety Guards</h2>
+  <p class="lead">
+    Because each CLI call builds a fresh input state, the pending suggestion is stored <strong>outside the
+    graph</strong>, in a small JSON file — mirroring the Task 2 profile store.
+  </p>
+
+  <h3>Where the pending suggestion lives</h3>
+  <div class="card">
+    <p>
+      <code class="inline">save_pending_recommendation()</code> /
+      <code class="inline">load_pending_recommendation()</code> in <span class="filepath">memory.py</span>
+      persist to <span class="filepath">memory/pending_recommendations/&lt;session&gt;.json</span> using the
+      same <strong>atomic temp-file-then-replace</strong> write. Saving <code class="inline">None</code>
+      deletes the file (clears pending).
+    </p>
+  </div>
+
+  <h3>How <span class="func">run_query()</span> dispatches each turn</h3>
+  <div class="card">
+    <pre>pending = load_pending_recommendation(session_id)
+if pending:
+    if is_confirmation(query):
+        effective_query = pending            # swap in the suggested query
+        save_pending_recommendation(session_id, None)   # clear first
+        # → falls through to the normal agent/tool loop
+    elif is_declination(query):
+        save_pending_recommendation(session_id, None)   # clear, no tools
+        return "Recommendation cancelled. Ask me anything else.", []
+    else:
+        refined = refine_suggestion(pending, query)     # treat as refinement
+        save_pending_recommendation(session_id, refined)
+        return format_suggestion_response(refined), []   # still pending, no tools</pre>
+  </div>
+
+  <h3>Safety guarantees</h3>
+  <div class="grid2">
+    <div class="card tight"><strong>No auto-execution.</strong> Suggest &amp; refine return early with empty step lists — the tool loop is never entered.</div>
+    <div class="card tight"><strong>No stale revival.</strong> Decline clears the file immediately, so a later "yes" finds no pending state and does nothing stale.</div>
+    <div class="card tight"><strong>Confirm-then-clear ordering.</strong> Pending is cleared <em>before</em> execution, so a crash mid-run can't replay the suggestion.</div>
+    <div class="card tight"><strong>No profile noise.</strong> Suggest/refine/decline turns skip the profile update, so facts like "user said yes" never pollute the Task 2 profile.</div>
+  </div>
+</section>
+
+<!-- ============ SCREEN 6: RUN & VERIFY ============ -->
+<section class="screen" id="run">
+  <h2>Run &amp; Verify</h2>
+
+  <h3>Full suggest → refine → confirm</h3>
+  <pre>python main.py --session demo --query "What should I query next?"
+python main.py --session demo --query "make it about refund examples"
+python main.py --session demo --query "yes, run it"
+# 1st: suggestion, no tools · 2nd: refined, no tools · 3rd: runs the query (reasoning trace)</pre>
+
+  <h3>Decline clears pending (no stale execution)</h3>
+  <pre>python main.py --session cancel --query "What should I query next?"
+python main.py --session cancel --query "no thanks"
+python main.py --session cancel --query "yes"
+# "no thanks" cancels; the later "yes" does NOT run the old suggestion</pre>
+
+  <h3>Interactive aliases</h3>
+  <pre>python main.py --session demo
+#  recommend   (or)   suggest     → request a follow-up suggestion
+#  then reply: yes / no / or describe a change</pre>
+
+  <h3>Rule-check unit smoke (no API key needed)</h3>
+  <pre>python - &lt;&lt;'PY'
+from recommender import is_confirmation, is_declination
+assert is_confirmation("yes, run it") and is_confirmation("go ahead")
+assert not is_confirmation("yesterday")
+assert is_declination("no thanks") and is_declination("never mind")
+assert not is_declination("knowledge")
+print("recommender rules ok")
+PY</pre>
+
+  <div class="note good">
+    <strong>Model split:</strong> the recommender uses <code class="inline">NEBIUS_RECOMMENDER_MODEL</code>
+    (a small/cheap model), falling back to <code class="inline">NEBIUS_MODEL</code> — appropriate for a
+    short-output, low-risk task.
+  </div>
+</section>
+
+<footer class="wrap">
+  Query Recommender summary · core file: <code class="inline">recommender.py</code> ·
+  routed &amp; dispatched in <code class="inline">agent.py</code> ·
+  pending state persisted via <code class="inline">memory.py</code>.
+</footer>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const screens = document.querySelectorAll('section.screen');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.tab;
+    tabs.forEach(b => b.classList.toggle('active', b === btn));
+    screens.forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }));
+</script>
+</body>
+</html>

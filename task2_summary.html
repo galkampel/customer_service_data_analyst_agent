@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task 2 — Persistent Memory</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f232f;
+    --border: #2b303d;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee0b8;
+    --warn: #f5b971;
+    --pink: #f08fc0;
+    --code-bg: #11141b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  header {
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #161a24, #0f1117);
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: .2px; }
+  header p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  nav.tabs {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 12px 20px; background: rgba(15,17,23,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 15px; font-size: 13.5px; cursor: pointer; transition: .15s;
+  }
+  nav.tabs button:hover { color: var(--text); border-color: #3a4254; }
+  nav.tabs button.active { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  section.screen { display: none; padding: 30px 0 70px; }
+  section.screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h2 { font-size: 21px; margin: 0 0 14px; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; color: var(--accent-2); }
+  p { margin: 10px 0; }
+  .lead { color: var(--muted); font-size: 15px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; margin: 14px 0;
+  }
+  .card.tight { padding: 14px 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  code, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: #cdd6e4; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px;
+    color: #cdd6e4;
+  }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.epi { background: #1c3350; color: #8fc1ff; }
+  .pill.prof { background: #1d3b30; color: #8fe6c0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .4px; }
+  td code { color: var(--accent); }
+  .note { border-left: 3px solid var(--accent); background: var(--panel-2); padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+  .note.warn { border-color: var(--warn); }
+  .note.good { border-color: var(--accent-2); }
+  .essential { color: var(--accent-2); font-weight: 600; }
+
+  /* diagram bits */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 18px 0; }
+  .node {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 18px; min-width: 150px; text-align: center; font-size: 14px;
+  }
+  .node .sub { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .node.epi { border-color: var(--accent); }
+  .node.prof { border-color: var(--accent-2); }
+  .node.store { border-color: var(--warn); }
+  .arrow { color: var(--muted); font-size: 18px; line-height: 1.1; padding: 4px 0; }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 720px) { .twocol { grid-template-columns: 1fr; } }
+  .colbox { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; background: var(--panel); }
+  .colbox.epi { border-top: 3px solid var(--accent); }
+  .colbox.prof { border-top: 3px solid var(--accent-2); }
+  .colbox h4 { margin: 0 0 8px; font-size: 15px; }
+  .filepath { color: var(--warn); font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+  footer { color: var(--muted); font-size: 12.5px; padding: 24px 0 40px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Task 2 — Persistent Memory</h1>
+    <p>Checkpoints · session IDs &amp; follow-ups · two-tier memory · a durable per-user profile stored separately from chat history</p>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="problem" class="active">1 · Problem</button>
+  <button data-tab="checkpoint">2 · Checkpoints</button>
+  <button data-tab="session">3 · Sessions &amp; Follow-ups</button>
+  <button data-tab="memory">4 · The Two Memories</button>
+  <button data-tab="profile">5 · The User Profile</button>
+  <button data-tab="run">6 · Run &amp; Verify</button>
+</nav>
+
+<div class="wrap">
+
+<!-- ============ SCREEN 1: PROBLEM ============ -->
+<section class="screen active" id="problem">
+  <h2>The Problem</h2>
+  <p class="lead">
+    Task 1's agent is <strong>stateless</strong>: every query starts from a blank slate. The moment the
+    process exits, everything it "knew" is gone. Task 2 makes the agent <strong>remember</strong> —
+    across turns and across restarts.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:8px">Two distinct things must persist</h3>
+    <ul>
+      <li><strong>The conversation itself</strong> (so follow-up questions like
+        <em>"and how many of those are refunds?"</em> have context), and</li>
+      <li><strong>durable facts about the user</strong> (so a stated preference like
+        <em>"I prefer concise answers with examples"</em> shapes future answers — even in a brand-new
+        conversation).</li>
+    </ul>
+    <p>These have different lifetimes and different shapes, so the design uses <strong>two separate
+      memory systems</strong>, deliberately kept apart.</p>
+  </div>
+
+  <h3>Task 2 requirements, restated</h3>
+  <table>
+    <tr><th>Requirement</th><th>Meaning</th></tr>
+    <tr><td>Persistent episodic memory</td><td>Conversation state survives restarts; same session resumes where it left off.</td></tr>
+    <tr><td>Session handling</td><td>A <code class="inline">session_id</code> identifies a conversation; follow-ups use prior turns.</td></tr>
+    <tr><td>Persistent user profile</td><td>Durable user facts, built and maintained over time.</td></tr>
+    <tr><td>Separation</td><td>The profile is stored <em>separately</em> from the conversation history.</td></tr>
+    <tr><td>No Task 1 regression</td><td>Routing, tools, and reasoning must still work exactly as before.</td></tr>
+  </table>
+
+  <div class="note good">
+    All Task 2 logic lives in <span class="filepath">memory.py</span>, wired into the graph and
+    <code class="inline">run_query()</code> in <span class="filepath">agent.py</span>, with CLI controls in
+    <span class="filepath">main.py</span>.
+  </div>
+</section>
+
+<!-- ============ SCREEN 2: CHECKPOINTS ============ -->
+<section class="screen" id="checkpoint">
+  <h2>What a Checkpoint Is</h2>
+  <p class="lead">
+    A <strong>checkpoint</strong> is a saved snapshot of the LangGraph <em>state</em> at a point in the
+    graph's execution. Because our state holds the full message list, a checkpoint effectively saves the
+    whole conversation so it can be reloaded later.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:6px">How LangGraph state becomes a checkpoint</h3>
+    <p>The graph state carries the conversation under an <code class="inline">add_messages</code> reducer:</p>
+    <pre>class AgentState(TypedDict):
+    messages: Annotated[list[BaseMessage], add_messages]   # append-only history
+    query_type: QueryType
+    iteration_count: int
+    session_id: str
+    user_profile: dict[str, Any]
+    pending_recommendation: str | None</pre>
+    <p>
+      The <code class="inline">add_messages</code> reducer means each step <em>appends</em> to the history
+      rather than replacing it. A <strong>checkpointer</strong> writes this state to durable storage after
+      each super-step, and reloads it when the same thread runs again.
+    </p>
+  </div>
+
+  <h3>How it's implemented — SQLite checkpointer</h3>
+  <div class="card">
+    <p>We use LangGraph's <code class="inline">SqliteSaver</code>, backed by a single database file:</p>
+    <pre># memory.py
+def get_checkpointer(db_path="memory/checkpoints.db"):
+    sqlite_module = import_module("langgraph.checkpoint.sqlite")
+    SqliteSaver = getattr(sqlite_module, "SqliteSaver")
+    conn = sqlite3.connect(db_file, check_same_thread=False)
+    return SqliteSaver(conn)
+
+# agent.py — graph is compiled WITH the checkpointer
+graph = build_graph(checkpointer=get_checkpointer())</pre>
+    <ul>
+      <li><strong>Storage:</strong> <span class="filepath">memory/checkpoints.db</span> — a plain SQLite file, so state survives process exit with zero external services.</li>
+      <li><strong>Keyed by thread:</strong> every checkpoint row carries a <code class="inline">thread_id</code> (our session ID — see next screen).</li>
+      <li><strong>Graceful import:</strong> if the SQLite checkpointer package is absent, <code class="inline">build_graph()</code> falls back to an in-memory graph so the app still runs.</li>
+    </ul>
+  </div>
+
+  <div class="note">
+    <strong>Why SQLite (not just an in-memory saver):</strong> it's persistent, file-based, requires no
+    server, and is queryable — which is exactly how <code class="inline">list_sessions()</code> later
+    enumerates known threads via <code class="inline">SELECT DISTINCT thread_id FROM checkpoints</code>.
+  </div>
+</section>
+
+<!-- ============ SCREEN 3: SESSIONS & FOLLOW-UPS ============ -->
+<section class="screen" id="session">
+  <h2>Session IDs &amp; Follow-up Questions</h2>
+  <p class="lead">
+    The <code class="inline">session_id</code> is the single thread key that ties everything together —
+    it is the checkpoint's <code class="inline">thread_id</code> <em>and</em> the filename for the profile
+    store. One ID, end to end.
+  </p>
+
+  <h3>How a session drives the checkpointer</h3>
+  <div class="card">
+    <pre># agent.py — run_query()
+config = {"configurable": {"thread_id": session_id}}
+for event in compiled_graph.stream(state, stream_mode="values", config=config):
+    ...</pre>
+    <p>
+      Passing <code class="inline">thread_id = session_id</code> tells the checkpointer which conversation
+      to load before the run and which to update after. Run again with the <em>same</em> ID and the prior
+      message history is restored automatically — even after a full restart.
+    </p>
+  </div>
+
+  <h3>How follow-up questions work</h3>
+  <div class="flow">
+    <div class="node store">Turn 1: "How many refund requests?"</div>
+    <div class="arrow">↓ &nbsp; checkpoint saved under <code class="inline">thread_id=alice</code></div>
+    <div class="node epi">checkpoints.db</div>
+    <div class="arrow">↓ &nbsp; (restart the app — state still on disk)</div>
+    <div class="node store">Turn 2 (same session): "And show me 3 examples of those"</div>
+    <div class="arrow">↓ &nbsp; checkpointer reloads Turn 1 history first</div>
+    <div class="node epi">agent sees full prior context → resolves "those"</div>
+  </div>
+  <p>
+    Because the restored <code class="inline">messages</code> list is prepended to the new turn, the agent
+    has the earlier exchange in context and can resolve references like "those" / "that category" without
+    the user repeating themselves.
+  </p>
+
+  <div class="grid2">
+    <div class="card tight">
+      <strong>Session isolation.</strong> <code class="inline">--session alice</code> and
+      <code class="inline">--session bob</code> use different <code class="inline">thread_id</code>s, so
+      their histories never bleed into each other.
+    </div>
+    <div class="card tight">
+      <strong>Discoverability.</strong> <code class="inline">list_sessions()</code> reads distinct
+      <code class="inline">thread_id</code>s straight from the checkpoint DB, powering
+      <code class="inline">--list-sessions</code> and the interactive <code class="inline">sessions</code> command.
+    </div>
+  </div>
+
+  <div class="note warn">
+    <strong>One subtlety handled in Task 1's loop:</strong> because old turns are restored, the agent
+    scopes its "do I have enough evidence yet?" checks to <em>only the current user turn</em>
+    (<code class="inline">_messages_since_latest_human</code>) so a restored history can't trigger a
+    premature final answer.
+  </div>
+</section>
+
+<!-- ============ SCREEN 4: THE TWO MEMORIES ============ -->
+<section class="screen" id="memory">
+  <h2>What "Memory" Is Here — and Why Two Kinds</h2>
+  <p class="lead">
+    "Memory" is split into two complementary systems with different shapes, lifetimes, and storage. This
+    separation is the core design decision of Task 2.
+  </p>
+
+  <div class="twocol">
+    <div class="colbox epi">
+      <h4><span class="pill epi">episodic memory</span></h4>
+      <p><strong>What:</strong> the literal conversation — every human/AI/tool message of a session.</p>
+      <p><strong>How:</strong> LangGraph SQLite checkpoints, keyed by <code class="inline">thread_id</code>.</p>
+      <p><strong>Store:</strong> <span class="filepath">memory/checkpoints.db</span></p>
+      <p><strong>Shape:</strong> append-only message log (verbatim, ordered).</p>
+      <p><strong>Lifetime:</strong> the life of that one conversation thread.</p>
+      <p><strong>Answers:</strong> "what did we just say?" → follow-up context.</p>
+    </div>
+    <div class="colbox prof">
+      <h4><span class="pill prof">profile memory</span></h4>
+      <p><strong>What:</strong> durable, distilled facts about the user.</p>
+      <p><strong>How:</strong> LLM extraction → conservative merge → JSON file.</p>
+      <p><strong>Store:</strong> <span class="filepath">memory/profiles/&lt;session&gt;.json</span></p>
+      <p><strong>Shape:</strong> small structured dict (preferences, constraints, …).</p>
+      <p><strong>Lifetime:</strong> grows and persists across all conversations.</p>
+      <p><strong>Answers:</strong> "what kind of user is this?" → personalization.</p>
+    </div>
+  </div>
+
+  <h3>Why not store everything in one place?</h3>
+  <div class="grid2">
+    <div class="card tight">
+      <strong>Different signal-to-noise.</strong> Raw chat history is verbose and full of one-off
+      wording; a profile is a tiny set of <em>durable</em> facts. Mixing them would bloat the prompt and
+      bury the signal.
+    </div>
+    <div class="card tight">
+      <strong>Different access pattern.</strong> Episodic memory is replayed wholesale by the graph;
+      the profile is injected as a compact summary into the system prompt — only the distilled facts,
+      never the whole transcript.
+    </div>
+    <div class="card tight">
+      <strong>Right tool per job.</strong> SQLite checkpoints are the LangGraph-native way to persist
+      graph state; human-readable JSON is ideal for a small, inspectable, editable profile.
+    </div>
+    <div class="card tight">
+      <strong>Robustness.</strong> If profile extraction fails, the conversation is unaffected, and vice
+      versa — the two systems fail independently.
+    </div>
+  </div>
+
+  <div class="note good">
+    A third, related store handles <strong>pending query recommendations</strong>
+    (<span class="filepath">memory/pending_recommendations/&lt;session&gt;.json</span>) — same JSON +
+    atomic-write pattern, used to remember a suggested-but-not-yet-confirmed query between turns.
+  </div>
+</section>
+
+<!-- ============ SCREEN 5: THE USER PROFILE ============ -->
+<section class="screen" id="profile">
+  <h2>Building &amp; Maintaining a Persistent User Profile</h2>
+  <p class="lead">
+    After each answer, the agent distills durable facts from the latest exchange and merges them into a
+    per-user JSON file — <strong>kept entirely separate from the conversation history</strong>.
+  </p>
+
+  <h3>The lifecycle (every turn)</h3>
+  <div class="flow">
+    <div class="node prof">1 · load profile JSON at query start<span class="sub">load_user_profile(session_id)</span></div>
+    <div class="arrow">↓ injected as a compact summary into the agent system prompt</div>
+    <div class="node prof">2 · agent answers, informed by stored facts</div>
+    <div class="arrow">↓ after the final answer</div>
+    <div class="node prof">3 · extract durable facts from this exchange<span class="sub">update_user_profile(...) — small LLM</span></div>
+    <div class="arrow">↓ conservative merge + dedupe</div>
+    <div class="node store">4 · atomic save back to &lt;session&gt;.json</div>
+  </div>
+
+  <h3>1 · Extraction — turn chat into structured facts</h3>
+  <div class="card">
+    <p>
+      A <strong>small, fast model</strong> (role <code class="inline">profile</code>) is given only the
+      latest user+assistant snippet and a strict prompt: return JSON, only
+      <em>durable</em> facts, ignore one-off requests, return <code class="inline">{}</code> if nothing
+      qualifies. The stable schema:
+    </p>
+    <pre>{
+  "preferences":         [],   // e.g. "concise answers with examples"
+  "frequent_categories": [],
+  "frequent_intents":    [],
+  "constraints":         [],
+  "notes":               []
+}</pre>
+    <p class="lead">Using the cheap model here keeps this background step low-cost and low-latency.</p>
+  </div>
+
+  <h3>2 · Conservative merge — never clobber, never bloat</h3>
+  <div class="card">
+    <p><code class="inline">_merge_profile()</code> appends new list items, <strong>deduplicates</strong>
+      (<code class="inline">sorted(set(...))</code>), skips empty values, and trims — so the profile grows
+      monotonically with real facts and never fills with noise or duplicates.</p>
+  </div>
+
+  <h3>3 · Durable, separate storage</h3>
+  <div class="card">
+    <ul>
+      <li><strong>One file per user:</strong> <span class="filepath">memory/profiles/&lt;session_id&gt;.json</span>
+        — physically separate from <span class="filepath">checkpoints.db</span>.</li>
+      <li><strong>Atomic writes:</strong> write to a temp file, then <code class="inline">replace()</code> —
+        a crash mid-write can never corrupt the profile.</li>
+      <li><strong>Safe IDs:</strong> session IDs are sanitized for filenames.</li>
+      <li><strong>Fail-safe reads:</strong> missing or malformed JSON returns a clean default schema
+        instead of crashing.</li>
+      <li><strong>Never breaks a query:</strong> if extraction throws, the original profile is returned —
+        a bad profile step can't fail the user's actual question.</li>
+    </ul>
+  </div>
+
+  <h3>4 · Using it — answering "what do you remember about me?"</h3>
+  <div class="card">
+    <p>
+      The profile is injected into the system prompt via
+      <code class="inline">format_profile_for_prompt()</code> on every turn, so it quietly shapes answers.
+      And a direct memory question short-circuits to read straight from the stored profile:
+    </p>
+    <pre># agent.py
+def is_memory_question(query):  # "what do you remember about me", ...
+    ...
+if is_memory_question(effective_query):
+    answer = format_profile_for_prompt(profile)   # answered from the JSON store</pre>
+  </div>
+
+  <div class="note good">
+    <strong>Why this satisfies "stored separately":</strong> conversation history lives in SQLite
+    checkpoints; the profile lives in its own JSON file. They're written by different code paths, have
+    different schemas, and can be inspected/edited independently — yet are linked by the one shared
+    <code class="inline">session_id</code>.
+  </div>
+</section>
+
+<!-- ============ SCREEN 6: RUN & VERIFY ============ -->
+<section class="screen" id="run">
+  <h2>Run &amp; Verify</h2>
+
+  <h3>Session controls (CLI)</h3>
+  <pre>python main.py --session alice                  # run within a named session
+python main.py --list-sessions                  # list persisted sessions
+# interactive commands:  profile  ·  sessions  ·  recommend  ·  exit</pre>
+
+  <h3>Verify episodic memory (follow-up across restart)</h3>
+  <pre>python main.py --session alice --query "How many refund requests did we get?"
+# ...restart...
+python main.py --session alice --query "Show me 3 examples of those"
+# expect: the agent resolves "those" from the restored conversation</pre>
+
+  <h3>Verify the persistent profile</h3>
+  <pre>python main.py --session memory-smoke --query "I prefer concise answers with examples."
+python main.py --session memory-smoke --query "What do you remember about me?"
+# expect: the stored preference is returned from memory/profiles/memory-smoke.json</pre>
+
+  <h3>Verify isolation</h3>
+  <pre>python main.py --session alice --query "..."
+python main.py --session bob   --query "What do you remember about me?"
+# expect: bob's profile does NOT contain alice's facts</pre>
+
+  <div class="note">
+    Where things live on disk:
+    <pre>memory/
+├── checkpoints.db                       # episodic memory (all sessions)
+├── profiles/&lt;session&gt;.json              # durable user profile (per session)
+└── pending_recommendations/&lt;session&gt;.json</pre>
+  </div>
+</section>
+
+<footer class="wrap">
+  Task 2 summary · Persistent Memory · core files:
+  <code class="inline">memory.py</code>, <code class="inline">agent.py</code>,
+  <code class="inline">main.py</code> · stores under <code class="inline">memory/</code>.
+</footer>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const screens = document.querySelectorAll('section.screen');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.tab;
+    tabs.forEach(b => b.classList.toggle('active', b === btn));
+    screens.forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }));
+</script>
+</body>
+</html>

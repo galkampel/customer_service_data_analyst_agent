@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task 1 — Customer Service Data Analyst Agent</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f232f;
+    --border: #2b303d;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --accent-2: #7ee0b8;
+    --warn: #f5b971;
+    --pink: #f08fc0;
+    --code-bg: #11141b;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  header {
+    padding: 28px 32px 18px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #161a24, #0f1117);
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: .2px; }
+  header p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+  nav.tabs {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 12px 20px; background: rgba(15,17,23,.92);
+    backdrop-filter: blur(6px); border-bottom: 1px solid var(--border);
+  }
+  nav.tabs button {
+    background: var(--panel); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 15px; font-size: 13.5px; cursor: pointer; transition: .15s;
+  }
+  nav.tabs button:hover { color: var(--text); border-color: #3a4254; }
+  nav.tabs button.active { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  section.screen { display: none; padding: 30px 0 70px; }
+  section.screen.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  h2 { font-size: 21px; margin: 0 0 14px; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; color: var(--accent-2); }
+  p { margin: 10px 0; }
+  .lead { color: var(--muted); font-size: 15px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px; margin: 14px 0;
+  }
+  .card.tight { padding: 14px 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+  code, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  code.inline { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; color: #cdd6e4; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px;
+    color: #cdd6e4;
+  }
+  ul { margin: 8px 0; padding-left: 22px; }
+  li { margin: 5px 0; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.s { background: #1c3350; color: #8fc1ff; }
+  .pill.u { background: #1d3b30; color: #8fe6c0; }
+  .pill.o { background: #4a2230; color: #f3a0bf; }
+  .pill.r { background: #45371b; color: #f5cd8a; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .4px; }
+  td code { color: var(--accent); }
+  .note { border-left: 3px solid var(--accent); background: var(--panel-2); padding: 10px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+  .note.warn { border-color: var(--warn); }
+  .note.good { border-color: var(--accent-2); }
+
+  /* Flow diagram */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; margin: 18px 0; }
+  .node {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 18px; min-width: 150px; text-align: center; font-size: 14px;
+  }
+  .node .sub { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .node.router { border-color: var(--accent); }
+  .node.agent { border-color: var(--accent-2); }
+  .node.tools { border-color: var(--warn); }
+  .node.term { border-color: #5a6275; color: var(--muted); }
+  .arrow { color: var(--muted); font-size: 18px; line-height: 1.1; padding: 4px 0; }
+  .branch { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .branch .col { display: flex; flex-direction: column; align-items: center; }
+  .loop-label { color: var(--warn); font-size: 12px; }
+  .tool-name { color: var(--accent); font-weight: 600; font-family: "SF Mono", Menlo, monospace; font-size: 13.5px; }
+  .essential { color: var(--accent-2); font-weight: 600; }
+  footer { color: var(--muted); font-size: 12.5px; padding: 24px 0 40px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Task 1 — Customer Service Data Analyst Agent</h1>
+    <p>Router · ReAct tool loop · transparent reasoning trace · max-iteration guard — built on LangGraph</p>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="problem" class="active">1 · Problem</button>
+  <button data-tab="solution">2 · Solution &amp; Flow</button>
+  <button data-tab="tools">3 · Tools</button>
+  <button data-tab="reasoning">4 · Multi-step Reasoning</button>
+  <button data-tab="run">5 · Run &amp; Debug</button>
+</nav>
+
+<div class="wrap">
+
+<!-- ============ SCREEN 1: PROBLEM ============ -->
+<section class="screen active" id="problem">
+  <h2>The Problem</h2>
+  <p class="lead">
+    Build a conversational <strong>data analyst agent</strong> over the Bitext Customer Service
+    dataset (≈26,872 rows of customer instructions, agent responses, categories, and intents).
+    A user should be able to ask natural-language questions and get accurate, data-grounded answers.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:8px">What makes this non-trivial</h3>
+    <ul>
+      <li><strong>Mixed query types.</strong> Some questions are precise and computational
+        (<em>"How many refund requests did we get?"</em>); others are open-ended
+        (<em>"Summarize the FEEDBACK category"</em>); some are entirely off-topic
+        (<em>"Who won the 2024 Champions League?"</em>). Each needs different handling.</li>
+      <li><strong>Answers must be grounded in data, not invented.</strong> A language model
+        alone will happily fabricate counts and percentages. The agent must compute real
+        numbers from the dataset.</li>
+      <li><strong>Some answers require multiple steps.</strong> "How many <code class="inline">cancel_order</code>
+        requests?" means <em>first filter</em> the data to that intent, <em>then count</em> — a chain,
+        not a single lookup.</li>
+      <li><strong>Reasoning must be transparent.</strong> The grader needs to <em>see</em> which
+        tools were chosen, with what arguments, and what each returned.</li>
+      <li><strong>It must terminate safely.</strong> A reasoning loop can spin forever; the agent
+        needs a guaranteed stop.</li>
+    </ul>
+  </div>
+
+  <h3>Task 1 requirements, restated</h3>
+  <table>
+    <tr><th>Requirement</th><th>Meaning</th></tr>
+    <tr><td>Query router</td><td>Classify the query <em>before</em> picking tools; decline out-of-scope.</td></tr>
+    <tr><td>Quality tools</td><td>Clear names, descriptions, and validated (Pydantic) inputs.</td></tr>
+    <tr><td>Multi-step reasoning</td><td>Chain tools, e.g. <code class="inline">filter_by_intent → count_rows</code>.</td></tr>
+    <tr><td>Reasoning visibility</td><td>Print tool calls &amp; observations before the final answer.</td></tr>
+    <tr><td>Max-iteration fallback</td><td>Graceful answer if the loop exceeds its budget.</td></tr>
+  </table>
+</section>
+
+<!-- ============ SCREEN 2: SOLUTION & FLOW ============ -->
+<section class="screen" id="solution">
+  <h2>The Solution &amp; Why This Flow</h2>
+  <p class="lead">
+    A <strong>LangGraph state machine</strong> with a dedicated <em>router</em> in front of a
+    <em>ReAct agent/tool loop</em>. The router decides the route; the agent reasons and calls
+    typed tools; the loop continues until the agent writes a final answer or hits a guard.
+    Source: <code class="inline">agent.py</code>.
+  </p>
+
+  <div class="card">
+    <h3 style="margin-top:6px">Graph flow</h3>
+    <div class="flow">
+      <div class="node term">START</div>
+      <div class="arrow">↓</div>
+      <div class="node router"><strong>router</strong><span class="sub">classify latest user turn</span></div>
+      <div class="arrow">↓ &nbsp;<span class="loop-label">conditional branch on query_type</span></div>
+      <div class="branch">
+        <div class="col">
+          <span class="pill s">structured</span>
+          <div class="arrow">↓</div>
+          <span class="pill u" style="margin-top:-4px">unstructured</span>
+          <div class="arrow">↓</div>
+          <div class="node agent"><strong>agent</strong><span class="sub">reason · maybe call tools</span></div>
+          <div class="arrow">↓ ⇅ <span class="loop-label">ReAct loop</span></div>
+          <div class="node tools"><strong>tools</strong><span class="sub">ToolNode executes</span></div>
+          <div class="arrow">↑ back to agent &nbsp; / &nbsp; ↓ END when final</div>
+          <div class="node term">END</div>
+        </div>
+        <div class="col">
+          <span class="pill o">out_of_scope</span>
+          <div class="arrow">↓</div>
+          <div class="node term" style="min-width:180px">out_of_scope<span class="sub">polite refusal</span></div>
+          <div class="arrow">↓</div>
+          <div class="node term">END</div>
+        </div>
+        <div class="col">
+          <span class="pill r">recommender</span>
+          <div class="arrow">↓</div>
+          <div class="node term" style="min-width:180px">recommender<span class="sub">suggest only, no exec</span></div>
+          <div class="arrow">↓</div>
+          <div class="node term">END</div>
+        </div>
+      </div>
+    </div>
+    <p class="lead" style="text-align:center;margin-top:4px">
+      <code class="inline">START → router → {agent ⇄ tools | out_of_scope | recommender} → END</code>
+    </p>
+  </div>
+
+  <h3>Why a <em>router-first</em> design</h3>
+  <div class="grid2">
+    <div class="card tight">
+      <strong>Separation of concerns.</strong> Classification is a small, cheap decision. Pushing it
+      into a dedicated node (on a smaller, faster model) keeps the expensive reasoning model focused
+      only on questions that are actually in scope.
+    </div>
+    <div class="card tight">
+      <strong>Safety / scope control.</strong> Out-of-scope queries are caught up front and
+      refused politely — they never reach the tool loop, so the agent can't be coaxed into
+      answering from general knowledge.
+    </div>
+    <div class="card tight">
+      <strong>Right behavior per type.</strong> Structured vs. unstructured questions need different
+      stopping rules (see Screen 4). Knowing the type early lets the agent node apply the correct policy.
+    </div>
+    <div class="card tight">
+      <strong>Defensive defaults.</strong> The router output is model text, so it's parsed
+      defensively (<code class="inline">normalize_query_type</code>) and, when uncertain, defaults
+      to <span class="pill s">structured</span> — preferring to <em>try</em> over wrongly refusing.
+    </div>
+  </div>
+
+  <h3>Why a ReAct loop (agent ⇄ tools)</h3>
+  <p>
+    The agent node binds the tools to the model. On each pass it either (a) emits one or more
+    <strong>tool calls</strong> → control goes to the <code class="inline">tools</code> node, which
+    runs them and feeds observations back, or (b) emits a <strong>final answer</strong> → the graph
+    ends. This is the classic <em>Reason → Act → Observe</em> cycle, and it is what enables
+    multi-step chaining: the model sees each observation and decides the next action.
+  </p>
+  <div class="note good">
+    <strong>Model split (why two models).</strong> The main reasoning/tool loop runs on the strong
+    <code class="inline">Llama-3.3-70B-Instruct</code>; the router runs on the fast
+    <code class="inline">Llama-3.1-8B-fast</code>. High-quality reasoning where it matters, low
+    latency/cost on the cheap classification step.
+  </div>
+</section>
+
+<!-- ============ SCREEN 3: TOOLS ============ -->
+<section class="screen" id="tools">
+  <h2>The Tools — and Why Each Is Essential</h2>
+  <p class="lead">
+    Nine tools in <code class="inline">tools.py</code>, each a <code class="inline">StructuredTool</code>
+    with an explicit name, an unambiguous description, and a <strong>Pydantic input schema</strong>.
+    The schemas matter: they validate arguments (e.g. <code class="inline">1 ≤ n ≤ 50</code>) and give
+    the model a precise contract, which sharply improves tool-selection accuracy.
+  </p>
+
+  <div class="note">
+    Several tools share a <strong>stateful "working set"</strong> (<code class="inline">_STATE["filtered_df"]</code>).
+    A <code class="inline">filter_*</code> tool narrows the data; later tools operate on that narrowed
+    set. This is the mechanism that makes multi-step chains both possible and efficient (Screen 4).
+  </div>
+
+  <h3>Discovery — "what is in the data?"</h3>
+  <table>
+    <tr><th>Tool</th><th>Does</th><th>Why essential</th></tr>
+    <tr>
+      <td><span class="tool-name">list_categories</span><br><code class="inline">()</code></td>
+      <td>All categories with row counts.</td>
+      <td>The entry point for an analyst who doesn't yet know the schema. Grounds every later
+        question in real category names.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">list_intents</span><br><code class="inline">(category)</code></td>
+      <td>Intents inside one category, with counts.</td>
+      <td>Bridges category → intent. Lets the model learn valid intent labels before filtering by them,
+        avoiding guessed/invalid intents.</td>
+    </tr>
+  </table>
+
+  <h3>Filtering — set up the working set</h3>
+  <table>
+    <tr><th>Tool</th><th>Does</th><th>Why essential</th></tr>
+    <tr>
+      <td><span class="tool-name">filter_by_intent</span><br><code class="inline">(intent)</code></td>
+      <td>Narrows the working set to one intent.</td>
+      <td><span class="essential">Core of multi-step reasoning.</span> Enables
+        <code class="inline">filter_by_intent → count_rows</code> and similar chains. Returns a
+        helpful error + sample intents if not found.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">filter_by_category</span><br><code class="inline">(category)</code></td>
+      <td>Narrows the working set to one category.</td>
+      <td>Same role at the category level; sets up cheap follow-ups like
+        <code class="inline">count_rows</code> or <code class="inline">show_examples</code> without
+        re-scanning the full dataset.</td>
+    </tr>
+  </table>
+
+  <h3>Measurement — exact numbers</h3>
+  <table>
+    <tr><th>Tool</th><th>Does</th><th>Why essential</th></tr>
+    <tr>
+      <td><span class="tool-name">count_rows</span><br><code class="inline">()</code></td>
+      <td>Counts the current working set (or full dataset).</td>
+      <td><span class="essential">Guarantees grounded counts.</span> The model never has to invent a
+        number — counts are computed in pandas. Pairs with the filters to answer "how many X?"</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">get_intent_distribution</span><br><code class="inline">(category?)</code></td>
+      <td>Intent counts <em>and</em> percentages, optionally per category.</td>
+      <td>Answers "distribution / breakdown" questions in a single call, so the model isn't forced to
+        chain many counts and do arithmetic itself.</td>
+    </tr>
+  </table>
+
+  <h3>Evidence — see the actual text</h3>
+  <table>
+    <tr><th>Tool</th><th>Does</th><th>Why essential</th></tr>
+    <tr>
+      <td><span class="tool-name">show_examples</span><br><code class="inline">(n, category?, intent?)</code></td>
+      <td>Sample rows (customer + agent text).</td>
+      <td>Qualitative questions ("show me examples") and grounding for summaries. Deterministic sampling
+        (<code class="inline">random_state=42</code>) keeps runs reproducible.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">search_responses</span><br><code class="inline">(keyword, n, use_working_set)</code></td>
+      <td><strong>Literal</strong> keyword search over instruction + response text.</td>
+      <td>Bridges the gap when the user's wording doesn't map to an exact intent name. Literal
+        (regex-off) matching is predictable and cheap; can search the filtered set for fast follow-ups.</td>
+    </tr>
+    <tr>
+      <td><span class="tool-name">summarize_category</span><br><code class="inline">(category, n_examples)</code></td>
+      <td>One-shot summary: stats + intent breakdown + representative examples.</td>
+      <td><span class="essential">Makes unstructured queries one-step.</span> Bundles everything a
+        summary needs into a single observation, so the agent gathers evidence once and then writes prose
+        (no looping — see Screen 4).</td>
+    </tr>
+  </table>
+
+  <div class="note good">
+    <strong>Why typed schemas (Pydantic) instead of free-form args:</strong> they constrain ranges,
+    mark optional vs. required fields, and document each argument inline. The model gets a precise
+    contract → fewer malformed calls, and bad inputs fail fast with a clear message instead of a
+    crash or a wrong answer.
+  </div>
+</section>
+
+<!-- ============ SCREEN 4: REASONING ============ -->
+<section class="screen" id="reasoning">
+  <h2>Approach to Multi-step Reasoning</h2>
+  <p class="lead">
+    Multi-step reasoning is driven by the <strong>ReAct loop</strong> plus the <strong>shared working
+    set</strong>, and kept safe by three layers of guards. The goal: chain when needed, stop as soon
+    as the answer is in hand, and <em>always</em> terminate.
+  </p>
+
+  <h3>1 · How chaining actually happens</h3>
+  <div class="card">
+    <p>Example: <em>"How many <code class="inline">cancel_order</code> requests are there?"</em></p>
+    <pre>agent  → tool_call: filter_by_intent(intent="cancel_order")
+tools  → observation: "Filter applied: intent='cancel_order' (category=CANCEL). Rows: 2,034."
+agent  → tool_call: count_rows()
+tools  → observation: "Current filtered working set: 2,034 rows (out of 26,872 total)."
+agent  → final answer: "There are 2,034 cancel_order requests."</pre>
+    <p>
+      The <code class="inline">filter_*</code> tool writes to <code class="inline">_STATE["filtered_df"]</code>;
+      <code class="inline">count_rows</code> reads it. The model only has to <em>sequence</em> the calls —
+      state passing is handled by the tools, not crammed into the prompt. Tool descriptions even hint at
+      the canonical chain ("<em>Typical chain: filter_by_intent, then count_rows</em>").
+    </p>
+  </div>
+
+  <h3>2 · Knowing when to <em>stop</em> (not just when to act)</h3>
+  <p>The hard part of multi-step reasoning is avoiding needless extra steps. Three mechanisms:</p>
+  <div class="grid2">
+    <div class="card tight">
+      <strong>Prompt discipline.</strong> The agent system prompt says: never call the same tool with
+      the same args twice; one or two calls are usually enough; for summaries a single
+      <code class="inline">summarize_category</code> call suffices.
+    </div>
+    <div class="card tight">
+      <strong>Unstructured early-finalize.</strong> For <span class="pill u">unstructured</span> queries,
+      once <em>one</em> tool observation exists <em>in the current turn</em>, the agent is switched to a
+      <em>tool-less</em> model and told to write the summary now — preventing summary loops.
+    </div>
+    <div class="card tight">
+      <strong>Repeat-call breaker.</strong> <code class="inline">_last_tool_call_repeats()</code> detects
+      two identical consecutive tool calls and forces a final answer with the tool-less model, so a stuck
+      model can't spin on the same call.
+    </div>
+    <div class="card tight">
+      <strong>Current-turn scoping.</strong> <code class="inline">_messages_since_latest_human()</code>
+      ensures these decisions look only at the <em>current</em> user turn — old observations from a
+      restored session can't trigger premature finalization.
+    </div>
+  </div>
+
+  <h3>3 · Guaranteed termination — the max-iteration fallback</h3>
+  <div class="card">
+    <p>
+      Every pass through the agent node increments <code class="inline">iteration_count</code>. When it
+      reaches <code class="inline">MAX_ITERATIONS = 12</code>, the agent stops looping and returns a
+      graceful message instead of continuing:
+    </p>
+    <pre>"I reached the maximum reasoning steps before completing this answer.
+ Please rephrase the request or split it into smaller questions."</pre>
+    <p class="lead">This is the hard backstop: no matter what the model does, the graph terminates.</p>
+  </div>
+
+  <div class="note warn">
+    <strong>Net effect:</strong> the agent chains tools when a question genuinely needs it
+    (filter → count), finalizes as soon as the evidence is sufficient (especially for summaries), and
+    can never run away — satisfying both the "multi-step reasoning" and "max-iteration fallback"
+    requirements of Task 1.
+  </div>
+</section>
+
+<!-- ============ SCREEN 5: RUN & DEBUG ============ -->
+<section class="screen" id="run">
+  <h2>Run &amp; Debug</h2>
+  <p class="lead">Reasoning visibility is built into both the CLI and LangGraph Studio.</p>
+
+  <h3>CLI — reasoning trace printed inline</h3>
+  <pre>source .venv/bin/activate
+
+# single query
+python main.py --query "How many refund requests did we get?"
+
+# interactive (type queries; see tool calls + observations before each answer)
+python main.py</pre>
+  <p>
+    <code class="inline">run_query()</code> streams graph events and prints
+    <code class="inline">[tool call] …</code>, <code class="inline">[observation from …]</code>, and
+    finally <code class="inline">[final answer]</code> — exactly the transparency Task 1 asks for.
+  </p>
+
+  <h3>LangGraph Studio — visual debug</h3>
+  <pre>langgraph dev</pre>
+  <p>Open the printed URL, load the <code class="inline">customer_service_agent</code> graph, then:</p>
+  <ul>
+    <li>Send a structured query and watch node order: <code class="inline">START → router → agent → tools → agent → END</code>.</li>
+    <li>Open the <strong>router</strong> output to confirm <code class="inline">query_type</code>.</li>
+    <li>Open <strong>agent/tool</strong> events to inspect the selected tool, its arguments, and the returned observation.</li>
+    <li>Send an out-of-scope query and confirm it routes to the refusal path with no knowledge answer.</li>
+  </ul>
+
+  <div class="note good">
+    Quick sanity checks:
+    <pre>python -c "import agent; print('graph initialized:', agent.graph is not None)"
+python -c "from data_loader import load_dataset; from tools import build_tools; \
+print('rows=', len(load_dataset()), 'tools=', len(build_tools()))"
+# expect: rows= 26872  tools= 9</pre>
+  </div>
+
+  <h3>Validation queries (cover every route)</h3>
+  <table>
+    <tr><th>Query</th><th>Expected route</th></tr>
+    <tr><td>How many refund requests did we get?</td><td><span class="pill s">structured</span> → tools → exact count</td></tr>
+    <tr><td>What is the distribution of intents in the ACCOUNT category?</td><td><span class="pill s">structured</span> → multi-step chain</td></tr>
+    <tr><td>Summarize the FEEDBACK category.</td><td><span class="pill u">unstructured</span> → one tool call → prose</td></tr>
+    <tr><td>Who won the 2024 Champions League?</td><td><span class="pill o">out_of_scope</span> → polite refusal</td></tr>
+    <tr><td>What should I query next?</td><td><span class="pill r">recommender</span> → suggestion only</td></tr>
+  </table>
+</section>
+
+<footer class="wrap">
+  Task 1 summary · Customer Service Data Analyst Agent · core files:
+  <code class="inline">agent.py</code>, <code class="inline">tools.py</code>,
+  <code class="inline">data_loader.py</code>, <code class="inline">llm_config.py</code>,
+  <code class="inline">main.py</code>, <code class="inline">langgraph.json</code>.
+</footer>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('nav.tabs button');
+  const screens = document.querySelectorAll('section.screen');
+  tabs.forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.dataset.tab;
+    tabs.forEach(b => b.classList.toggle('active', b === btn));
+    screens.forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }));
+</script>
+</body>
+</html>
