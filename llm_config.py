@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 
 DEFAULT_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
-DEFAULT_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct-fast"
+DEFAULT_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 
 # Load environment variables from a local .env file if present.
 load_dotenv()

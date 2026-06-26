@@ -24,11 +24,11 @@ source .venv/bin/activate
 ```bash
 NEBIUS_API_KEY=<your_key>
 NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1/
-NEBIUS_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
+NEBIUS_MODEL=meta-llama/Llama-3.3-70B-Instruct
 NEBIUS_MAIN_MODEL=meta-llama/Llama-3.3-70B-Instruct
-NEBIUS_ROUTER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
-NEBIUS_PROFILE_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
-NEBIUS_RECOMMENDER_MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-fast
+NEBIUS_ROUTER_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
+NEBIUS_PROFILE_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
+NEBIUS_RECOMMENDER_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
 ```
 
 3. Quick syntax gate:
@@ -43,10 +43,10 @@ All LLM calls use Nebius Token Factory models.
 
 Role mapping:
 - Main agent (`NEBIUS_MAIN_MODEL`): `meta-llama/Llama-3.3-70B-Instruct`
-- Router (`NEBIUS_ROUTER_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
-- Profile extractor (`NEBIUS_PROFILE_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
-- Query recommender (`NEBIUS_RECOMMENDER_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
-- Fallback (`NEBIUS_MODEL`): `meta-llama/Meta-Llama-3.1-8B-Instruct-fast`
+- Router (`NEBIUS_ROUTER_MODEL`): `Qwen/Qwen3-30B-A3B-Instruct-2507`
+- Profile extractor (`NEBIUS_PROFILE_MODEL`): `Qwen/Qwen3-30B-A3B-Instruct-2507`
+- Query recommender (`NEBIUS_RECOMMENDER_MODEL`): `Qwen/Qwen3-30B-A3B-Instruct-2507`
+- Fallback (`NEBIUS_MODEL`): `meta-llama/Llama-3.3-70B-Instruct`
 
 Why this split:
 - Strong model on the main reasoning/tool-use loop improves answer quality.
