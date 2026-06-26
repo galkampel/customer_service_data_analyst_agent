@@ -465,6 +465,11 @@ def run_query(
     return answer, steps
 
 
+# Exposed for LangGraph Studio Task 1 debugging. Studio can still pass a
+# thread_id, but Task 1 does not require persisted checkpoints.
+studio_graph = build_graph()
+
+
 # Exposed for LangGraph CLI integrations.
 # Keep module import safe when NEBIUS_API_KEY is not set.
 try:
